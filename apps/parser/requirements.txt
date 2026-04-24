@@ -1,0 +1,36 @@
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+
+# Database
+asyncpg==0.30.0
+alembic==1.14.0
+sqlalchemy==2.0.36
+psycopg2-binary==2.9.10
+
+# PDF parsing
+pdfplumber==0.11.4
+pypdf==5.1.0
+
+# Excel / data
+pandas==2.2.3
+openpyxl==3.1.5
+
+# Task queue
+celery==5.4.0
+redis==5.2.0
+
+# File storage (MinIO S3-compatible)
+boto3==1.35.74
+
+# Validation
+pydantic==2.10.3
+pydantic-settings==2.7.0
+
+# Utilities
+python-multipart==0.0.19
+httpx==0.28.1
+
+# Dev / testing
+pytest==8.3.4
+pytest-asyncio==0.25.0

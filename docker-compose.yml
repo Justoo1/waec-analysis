@@ -1,0 +1,121 @@
+services:
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://waec:waec@db:5432/waec_analytics
+      DIRECT_URL: postgresql://waec:waec@db:5432/waec_analytics
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      PARSER_SERVICE_URL: http://parser:8000
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-waec-uploads}
+      MINIO_USE_SSL: "false"
+      BASE_DOMAIN: ${BASE_DOMAIN:-waecanalytics.com}
+      NEXT_PUBLIC_BASE_DOMAIN: ${BASE_DOMAIN:-waecanalytics.com}
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  parser:
+    build:
+      context: ./apps/parser
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://waec:waec@db:5432/waec_analytics
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-waec-uploads}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./apps/parser
+      dockerfile: Dockerfile
+    command: celery -A app.workers.tasks worker --loglevel=info --concurrency=2
+    environment:
+      DATABASE_URL: postgresql://waec:waec@db:5432/waec_analytics
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-waec-uploads}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: waec
+      POSTGRES_PASSWORD: waec
+      POSTGRES_DB: waec_analytics
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U waec -d waec_analytics"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/waec.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web
+      - parser
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redis_data:
+  minio_data:
