@@ -1,125 +1,239 @@
 "use client";
 
-import { useState } from "react";
-import { CANDIDATES } from "@/lib/mock-data";
+import { useEffect, useRef, useState } from "react";
 
-type UploadState = "empty" | "parsing" | "preview";
+type UploadState = "empty" | "parsing" | "preview" | "error";
 
-const PREVIOUS_UPLOADS = [
-  { year: 2024, date: "12 Jan 2025", count: 909 },
-  { year: 2023, date: "08 Feb 2024", count: 872 },
-];
+interface Sitting {
+  id: number;
+  year: number;
+  totalCandidates: number | null;
+  parsedAt: string;
+}
 
 export function UploadDropzone() {
   const [state, setState] = useState<UploadState>("empty");
   const [progress, setProgress] = useState(0);
+  const [progressStage, setProgressStage] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [fileName, setFileName] = useState("");
+  const [parsedCount, setParsedCount] = useState(0);
+  const [parsedYear, setParsedYear] = useState<number | null>(null);
+  const [sittingYear, setSittingYear] = useState(new Date().getFullYear());
+  const [errorMsg, setErrorMsg] = useState("");
+  const [sittings, setSittings] = useState<Sitting[]>([]);
 
-  function simulateParse() {
-    setState("parsing");
-    setProgress(0);
-    let p = 0;
-    const iv = setInterval(() => {
-      p += Math.random() * 4 + 1;
-      if (p >= 100) {
-        p = 100;
-        clearInterval(iv);
-        setTimeout(() => setState("preview"), 400);
-      }
-      setProgress(Math.min(p, 100));
-    }, 120);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    fetch("/api/sittings")
+      .then((r) => r.json())
+      .then((d) => setSittings(d.sittings ?? []))
+      .catch(() => {});
+  }, []);
+
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
   }
 
-  const candSoFar = Math.floor((progress / 100) * 909);
-  const pageSoFar = Math.floor((progress / 100) * 191);
+  function pollStatus(taskId: string) {
+    pollRef.current = setInterval(async () => {
+      try {
+        const resp = await fetch(`/api/upload/status/${taskId}`);
+        const data = await resp.json();
 
+        if (data.status === "PROGRESS" && data.result) {
+          setProgress(data.result.progress ?? 0);
+          setProgressStage(data.result.stage ?? "");
+          if (data.result.total_candidates) {
+            setParsedCount(data.result.total_candidates);
+          }
+        } else if (data.status === "SUCCESS" && data.result) {
+          stopPolling();
+          setProgress(100);
+          setParsedCount(data.result.total_candidates ?? 0);
+          setParsedYear(sittingYear);
+          setState("preview");
+          // Refresh sittings list
+          fetch("/api/sittings")
+            .then((r) => r.json())
+            .then((d) => setSittings(d.sittings ?? []))
+            .catch(() => {});
+        } else if (data.status === "FAILURE") {
+          stopPolling();
+          setErrorMsg("Parsing failed. Please check the file format and try again.");
+          setState("error");
+        }
+      } catch {
+        // network hiccup — keep polling
+      }
+    }, 2000);
+  }
+
+  async function handleFile(file: File) {
+    setFileName(file.name);
+    setProgress(0);
+    setProgressStage("uploading");
+    setState("parsing");
+    setParsedCount(0);
+
+    const form = new FormData();
+    form.append("file", file);
+    form.append("sitting_year", String(sittingYear));
+
+    try {
+      const resp = await fetch("/api/upload", { method: "POST", body: form });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        setErrorMsg(data.error ?? "Upload failed. Please try again.");
+        setState("error");
+        return;
+      }
+
+      pollStatus(data.task_id);
+    } catch {
+      setErrorMsg("Could not reach the server. Please try again.");
+      setState("error");
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  }
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 6 }, (_, i) => currentYear - i);
+
+  // ── Parsing state ───────────────────────────────────────────────────────────
   if (state === "parsing") {
     return (
       <div style={{ background: "#fff", borderRadius: 8, padding: "32px 28px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
           <span style={{ fontSize: 20 }}>📄</span>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: "#0D1F17" }}>WAEC_Results_Listing_25.pdf</div>
-            <div style={{ fontSize: 12, color: "#6B6860" }}>Parsing in progress…</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: "#0D1F17" }}>{fileName}</div>
+            <div style={{ fontSize: 12, color: "#6B6860" }}>
+              {progressStage === "uploading" ? "Uploading…" :
+               progressStage === "parsing"  ? "Parsing file…" :
+               progressStage === "schema_ready" ? "Preparing database…" :
+               progressStage === "persisted" ? "Saving candidates…" :
+               "Processing…"}
+            </div>
           </div>
         </div>
         <div style={{ height: 8, background: "#F0EDE6", borderRadius: 4, marginBottom: 10, overflow: "hidden" }}>
           <div
-            style={{ height: "100%", width: `${progress}%`, background: "#1A6B47", borderRadius: 4, transition: "width 0.1s linear" }}
+            style={{
+              height: "100%",
+              width: `${progress}%`,
+              background: "#1A6B47",
+              borderRadius: 4,
+              transition: "width 0.3s linear",
+            }}
           />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6B6860" }}>
-          <span>Parsing page {pageSoFar} of 191…</span>
+          <span>{parsedCount > 0 ? `${parsedCount} candidates found so far` : "Working…"}</span>
           <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600, color: "#1A6B47" }}>
             {Math.floor(progress)}%
           </span>
         </div>
-        <div style={{ fontSize: 12, color: "#6B6860", marginTop: 6 }}>{candSoFar} candidates found so far</div>
       </div>
     );
   }
 
+  // ── Preview / confirmation state ────────────────────────────────────────────
   if (state === "preview") {
     return (
       <div style={{ background: "#fff", borderRadius: 8, padding: "28px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
           <span style={{ fontSize: 22, color: "#1A6B47" }}>✓</span>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#0D1F17" }}>Successfully parsed 909 candidates</div>
-            <div style={{ fontSize: 12, color: "#6B6860" }}>Exam Year detected: <strong>2025</strong></div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#0D1F17" }}>
+              Successfully imported {parsedCount.toLocaleString()} candidates
+            </div>
+            <div style={{ fontSize: 12, color: "#6B6860" }}>
+              Exam Year: <strong>{parsedYear}</strong>
+            </div>
           </div>
         </div>
-
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#6B6860", marginBottom: 8 }}>
-          Sample (first 5 candidates)
+        <div style={{ background: "#EEF6F2", borderRadius: 6, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: "#1A6B47" }}>
+          Dashboard data has been updated. Navigate to Results or Subjects to explore.
         </div>
-        <div style={{ background: "#FAFAF8", borderRadius: 6, overflow: "hidden", marginBottom: 20 }}>
-          {CANDIDATES.slice(0, 5).map((c, i) => (
-            <div
-              key={c.index}
-              style={{
-                display: "flex", gap: 12, padding: "9px 14px", fontSize: 12,
-                borderBottom: i < 4 ? "1px solid #E2E0D8" : "none",
-              }}
-            >
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "#6B6860", flexShrink: 0 }}>{c.index}</span>
-              <span style={{ flex: 1, fontWeight: 500, color: "#0D1F17" }}>{c.name}</span>
-              <span style={{ color: "#6B6860" }}>{c.gender}</span>
-              <span style={{ color: "#6B6860" }}>{c.total} subjects</span>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ background: "#FEF3E2", borderRadius: 6, padding: "10px 14px", marginBottom: 24, fontSize: 12, color: "#C07818" }}>
-          ⚠ This will replace any existing 2025 data. This action cannot be undone.
-        </div>
-
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button
-            onClick={() => setState("empty")}
-            style={{ padding: "7px 14px", borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: "pointer", background: "transparent", color: "#0D1F17", border: "1px solid #E2E0D8" }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => setState("empty")}
+            onClick={() => { setState("empty"); setProgress(0); }}
             style={{ padding: "7px 14px", borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: "pointer", background: "#1A6B47", color: "#fff", border: "none" }}
           >
-            Confirm Import →
+            Done
           </button>
         </div>
       </div>
     );
   }
 
-  // empty state
+  // ── Error state ─────────────────────────────────────────────────────────────
+  if (state === "error") {
+    return (
+      <div style={{ background: "#fff", borderRadius: 8, padding: "28px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <span style={{ fontSize: 22, color: "#B83232" }}>✕</span>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "#0D1F17" }}>Import failed</div>
+        </div>
+        <div style={{ fontSize: 13, color: "#B83232", marginBottom: 20 }}>{errorMsg}</div>
+        <button
+          onClick={() => { setState("empty"); setProgress(0); setErrorMsg(""); }}
+          style={{ padding: "7px 14px", borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: "pointer", background: "#0D1F17", color: "#fff", border: "none" }}
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  // ── Empty / default state ───────────────────────────────────────────────────
   return (
     <div style={{ maxWidth: 660 }}>
+      {/* Year picker */}
+      <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
+        <label style={{ fontSize: 13, fontWeight: 500, color: "#0D1F17" }}>Exam Year:</label>
+        <select
+          value={sittingYear}
+          onChange={(e) => setSittingYear(Number(e.target.value))}
+          style={{ fontSize: 13, padding: "4px 10px", borderRadius: 6, border: "1px solid #E2E0D8", background: "#fff", cursor: "pointer" }}
+        >
+          {yearOptions.map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Drop zone */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.xlsx"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFile(f);
+          // Reset so the same file can be re-uploaded
+          e.target.value = "";
+        }}
+      />
       <div
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
-        onDrop={(e) => { e.preventDefault(); setDragging(false); simulateParse(); }}
-        onClick={simulateParse}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
         style={{
           border: `2px dashed ${dragging ? "#1A6B47" : "#E2E0D8"}`,
           borderRadius: 12,
@@ -145,25 +259,26 @@ export function UploadDropzone() {
         </div>
       </div>
 
+      {/* Previous uploads */}
       <div style={{ background: "#fff", borderRadius: 8, padding: "16px 20px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
         <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", color: "#6B6860", marginBottom: 10 }}>
           Previous Uploads
         </div>
-        {PREVIOUS_UPLOADS.map((u) => (
+        {sittings.length === 0 && (
+          <div style={{ fontSize: 13, color: "#6B6860", padding: "8px 0" }}>No uploads yet.</div>
+        )}
+        {sittings.map((u) => (
           <div
-            key={u.year}
+            key={u.id}
             style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid #E2E0D8" }}
           >
             <span style={{ fontSize: 14, color: "#1A6B47" }}>✓</span>
             <div style={{ flex: 1 }}>
               <span style={{ fontSize: 13, fontWeight: 500, color: "#0D1F17" }}>WASSCE {u.year}</span>
               <span style={{ fontSize: 12, color: "#6B6860", marginLeft: 10 }}>
-                Imported {u.date} · {u.count} candidates
+                {u.totalCandidates != null ? `${u.totalCandidates.toLocaleString()} candidates` : ""}
               </span>
             </div>
-            <button style={{ fontSize: 12, color: "#1A6B47", background: "none", border: "none", cursor: "pointer" }}>
-              View →
-            </button>
           </div>
         ))}
       </div>

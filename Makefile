@@ -201,6 +201,19 @@ parser-dev: ## Run FastAPI dev server locally with auto-reload
 worker-dev: ## Run Celery worker locally
 	cd $(PARSER_DIR) && celery -A app.workers.tasks worker --loglevel=info
 
+# ─── Testing ──────────────────────────────────────────────────────────────────
+
+.PHONY: test-parser
+test-parser: ## Run FastAPI pytest suite inside the parser container
+	$(DOCKER_COMPOSE) exec parser python -m pytest tests/ -v
+
+.PHONY: test-web
+test-web: ## Run Next.js vitest suite inside the web container
+	$(DOCKER_COMPOSE) exec web npm test
+
+.PHONY: test
+test: test-parser test-web ## Run all tests (parser + web)
+
 # ─── Health checks ────────────────────────────────────────────────────────────
 
 .PHONY: health

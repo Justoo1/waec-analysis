@@ -1,8 +1,7 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/lib/db/tenant";
-import { users } from "@/lib/db/schema";
+import { users, schools } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -12,7 +11,6 @@ const signInSchema = z.object({
 });
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: DrizzleAdapter(db),
   session: {
     strategy: "jwt",
   },
@@ -38,10 +36,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!user || !user.isActive) return null;
 
-        // TODO: replace with bcrypt once DB is seeded
-        // const { compare } = await import("bcryptjs")
-        // if (!(await compare(password, user.passwordHash ?? ""))) return null
-        void password;
+        const { compare } = await import("bcryptjs");
+        if (!(await compare(password, user.passwordHash ?? ""))) return null;
+
+        // Fetch the school's subdomain-routable identifier
+        let schoolNumber: string | null = null;
+        if (user.schoolId) {
+          const school = await db
+            .select({ schoolNumber: schools.schoolNumber })
+            .from(schools)
+            .where(eq(schools.id, user.schoolId))
+            .limit(1)
+            .then((r) => r[0]);
+          schoolNumber = school?.schoolNumber ?? null;
+        }
 
         return {
           id: String(user.id),
@@ -49,6 +57,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.fullName,
           role: user.role,
           schoolId: user.schoolId,
+          schoolNumber,
         };
       },
     }),
@@ -58,12 +67,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.role = (user as { role?: string | null }).role;
         token.schoolId = (user as { schoolId?: number | null }).schoolId;
+        token.schoolNumber = (user as { schoolNumber?: string | null }).schoolNumber;
       }
       return token;
     },
     session({ session, token }) {
       session.user.role = token.role as string;
       session.user.schoolId = token.schoolId as number | null;
+      session.user.schoolNumber = token.schoolNumber as string | null;
       return session;
     },
   },
@@ -82,6 +93,7 @@ declare module "next-auth" {
       name: string | null;
       role: string;
       schoolId: number | null;
+      schoolNumber: string | null;
     };
   }
 }

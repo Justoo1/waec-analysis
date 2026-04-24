@@ -50,19 +50,17 @@ export async function proxy(request: NextRequest) {
     PROTECTED_PATHS.some((p) => p !== "/" && pathname.startsWith(p));
   const isAuthPath = AUTH_PATHS.some((p) => pathname.startsWith(p));
 
-  if (isDashboardPath) {
+  if (isDashboardPath || isAuthPath) {
     const session = await auth();
-    if (!session?.user) {
+
+    if (isDashboardPath && !session?.user) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("callbackUrl", pathname);
       return NextResponse.redirect(loginUrl);
     }
-  }
 
-  // ── 5. Redirect authenticated users away from login/register ─────────────
-  if (isAuthPath) {
-    const session = await auth();
-    if (session?.user) {
+    // ── 5. Redirect authenticated users away from login/register ───────────
+    if (isAuthPath && session?.user) {
       return NextResponse.redirect(new URL("/", request.url));
     }
   }

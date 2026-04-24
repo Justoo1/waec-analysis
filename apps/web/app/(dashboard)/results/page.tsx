@@ -1,12 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { CANDIDATES, STATS } from "@/lib/mock-data";
-import type { Candidate } from "@/lib/mock-data";
+import { useEffect, useState, useCallback } from "react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { CandidatePanel } from "@/components/CandidatePanel";
-
-const PROGRAMMES = [...new Set(CANDIDATES.map((c) => c.programme))].sort();
+import type { Candidate } from "@/lib/mock-data";
 
 const TH_STYLE: React.CSSProperties = {
   padding: "10px 14px", textAlign: "left",
@@ -14,19 +11,92 @@ const TH_STYLE: React.CSSProperties = {
   textTransform: "uppercase", letterSpacing: "0.07em", whiteSpace: "nowrap",
 };
 
+interface ApiCandidate {
+  id: number;
+  indexNumber: string;
+  fullName: string | null;
+  gender: string | null;
+  dateOfBirth: string | null;
+  programme: string | null;
+  status: string;
+  totalPasses: number | null;
+  bestSixAggregate: number | null;
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+// Convert API candidate to the shape CandidatePanel expects
+function toCandidateShape(c: ApiCandidate): Candidate {
+  return {
+    index: c.indexNumber,
+    name: c.fullName ?? "",
+    gender: (c.gender as "F" | "M") ?? "F",
+    dob: c.dateOfBirth ?? "",
+    status: (c.status as Candidate["status"]) ?? "no-qualify",
+    passes: c.totalPasses ?? 0,
+    total: 8,
+    agg: c.bestSixAggregate,
+    programme: c.programme ?? "",
+    results: [],
+  };
+}
+
 export default function CandidatesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [progFilter, setProgFilter] = useState("all");
+  const [page, setPage] = useState(1);
+
+  const [candidates, setCandidates] = useState<ApiCandidate[]>([]);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [programmes, setProgrammes] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Candidate | null>(null);
 
-  const filtered = CANDIDATES.filter((c) => {
-    const q = search.toLowerCase();
-    const matchSearch = !q || c.name.toLowerCase().includes(q) || c.index.includes(q);
-    const matchStatus = statusFilter === "all" || c.status === statusFilter;
-    const matchProg = progFilter === "all" || c.programme === progFilter;
-    return matchSearch && matchStatus && matchProg;
-  });
+  const fetchCandidates = useCallback(async () => {
+    setLoading(true);
+    const params = new URLSearchParams({ page: String(page), limit: "50" });
+    if (search) params.set("search", search);
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (progFilter !== "all") params.set("programme", progFilter);
+
+    try {
+      const resp = await fetch(`/api/candidates?${params}`);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      setCandidates(data.candidates ?? []);
+      setPagination(data.pagination ?? null);
+      // Collect unique programmes from first load
+      if (programmes.length === 0 && data.candidates?.length) {
+        const progs = [...new Set<string>(
+          data.candidates.map((c: ApiCandidate) => c.programme ?? "")
+        )].filter(Boolean).sort();
+        setProgrammes(progs);
+      }
+    } finally {
+      setLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, statusFilter, progFilter, page]);
+
+  useEffect(() => {
+    const timeout = setTimeout(fetchCandidates, search ? 300 : 0);
+    return () => clearTimeout(timeout);
+  }, [fetchCandidates, search]);
+
+  // Fetch all programme options once on mount
+  useEffect(() => {
+    fetch("/api/candidates?limit=1")
+      .then((r) => r.json())
+      .catch(() => {});
+  }, []);
+
+  const total = pagination?.total ?? 0;
 
   return (
     <div>
@@ -34,7 +104,9 @@ export default function CandidatesPage() {
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24, paddingBottom: 20, borderBottom: "1px solid #E2E0D8" }}>
         <div>
           <h1 style={{ fontFamily: "'Lora', serif", fontSize: 26, fontWeight: 500, color: "#0D1F17", margin: 0 }}>Candidates</h1>
-          <div style={{ fontSize: 13, color: "#6B6860", marginTop: 4 }}>WASSCE 2025 · {STATS.totalCandidates} total candidates</div>
+          <div style={{ fontSize: 13, color: "#6B6860", marginTop: 4 }}>
+            {total > 0 ? `${total.toLocaleString()} total candidates` : "Loading…"}
+          </div>
         </div>
       </div>
 
@@ -44,14 +116,14 @@ export default function CandidatesPage() {
           <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#6B6860", fontSize: 14 }}>⌕</span>
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search by name or index number…"
             style={{ width: "100%", padding: "8px 12px 8px 30px", borderRadius: 6, border: "1px solid #E2E0D8", fontSize: 13, background: "#fff", boxSizing: "border-box", outline: "none" }}
           />
         </div>
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
           style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid #E2E0D8", fontSize: 13, background: "#fff", cursor: "pointer" }}
         >
           <option value="all">All Status</option>
@@ -61,65 +133,51 @@ export default function CandidatesPage() {
         </select>
         <select
           value={progFilter}
-          onChange={(e) => setProgFilter(e.target.value)}
+          onChange={(e) => { setProgFilter(e.target.value); setPage(1); }}
           style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid #E2E0D8", fontSize: 13, background: "#fff", cursor: "pointer" }}
         >
           <option value="all">All Programmes</option>
-          {PROGRAMMES.map((p) => <option key={p} value={p}>{p}</option>)}
+          {programmes.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
-        <button style={{ padding: "7px 14px", borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: "pointer", background: "transparent", color: "#0D1F17", border: "1px solid #E2E0D8", marginLeft: "auto" }}>
-          ⬇ Export
-        </button>
-      </div>
-
-      {/* Summary strip */}
-      <div style={{ background: "#EEF6F2", borderRadius: 6, padding: "8px 14px", fontSize: 12, color: "#1A6B47", marginBottom: 14, display: "flex", gap: 16 }}>
-        <span>Showing <strong>{filtered.length}</strong> of {STATS.totalCandidates} candidates</span>
-        <span>·</span>
-        <span>✓ {STATS.qualifiers} qualify</span>
-        <span>·</span>
-        <span style={{ color: "#C07818" }}>◑ {STATS.borderline} borderline</span>
-        <span>·</span>
-        <span style={{ color: "#B83232" }}>✕ {STATS.noQualify} do not qualify</span>
       </div>
 
       {/* Table */}
       <div style={{ background: "#fff", borderRadius: 8, boxShadow: "0 1px 3px rgba(0,0,0,0.06)", overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ background: "#FAFAF8", borderBottom: "2px solid #E2E0D8" }}>
-              {["Index", "Name", "Gender", "DOB", "Programme", "Status", "Passes", "Agg"].map((h) => (
-                <th key={h} style={TH_STYLE}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((c, i) => (
-              <tr
-                key={c.index}
-                onClick={() => setSelected(c)}
-                style={{
-                  background: i % 2 === 0 ? "#fff" : "#FAFAF8",
-                  cursor: "pointer",
-                  borderBottom: "1px solid #E2E0D8",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#EEF6F2")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#FAFAF8")}
-              >
-                <td style={{ padding: "10px 14px", fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6B6860" }}>{c.index}</td>
-                <td style={{ padding: "10px 14px", fontSize: 13, fontWeight: 500, color: "#0D1F17" }}>{c.name}</td>
-                <td style={{ padding: "10px 14px", fontSize: 12, color: "#6B6860" }}>{c.gender === "F" ? "Female" : "Male"}</td>
-                <td style={{ padding: "10px 14px", fontSize: 12, color: "#6B6860", fontFamily: "'JetBrains Mono', monospace" }}>{c.dob}</td>
-                <td style={{ padding: "10px 14px", fontSize: 12, color: "#6B6860" }}>{c.programme}</td>
-                <td style={{ padding: "10px 14px" }}><StatusBadge status={c.status} /></td>
-                <td style={{ padding: "10px 14px", fontSize: 12, color: "#0D1F17", textAlign: "center" }}>{c.passes}/{c.total}</td>
-                <td style={{ padding: "10px 14px", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#0D1F17", textAlign: "center" }}>{c.agg ?? "—"}</td>
+        {loading ? (
+          <div style={{ padding: 48, textAlign: "center", color: "#6B6860", fontSize: 13 }}>Loading candidates…</div>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#FAFAF8", borderBottom: "2px solid #E2E0D8" }}>
+                {["Index", "Name", "Gender", "DOB", "Programme", "Status", "Passes", "Agg"].map((h) => (
+                  <th key={h} style={TH_STYLE}>{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {candidates.map((c, i) => (
+                <tr
+                  key={c.id}
+                  onClick={() => setSelected(toCandidateShape(c))}
+                  style={{ background: i % 2 === 0 ? "#fff" : "#FAFAF8", cursor: "pointer", borderBottom: "1px solid #E2E0D8" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "#EEF6F2")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#FAFAF8")}
+                >
+                  <td style={{ padding: "10px 14px", fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6B6860" }}>{c.indexNumber}</td>
+                  <td style={{ padding: "10px 14px", fontSize: 13, fontWeight: 500, color: "#0D1F17" }}>{c.fullName}</td>
+                  <td style={{ padding: "10px 14px", fontSize: 12, color: "#6B6860" }}>{c.gender === "F" ? "Female" : "Male"}</td>
+                  <td style={{ padding: "10px 14px", fontSize: 12, color: "#6B6860", fontFamily: "'JetBrains Mono', monospace" }}>{c.dateOfBirth ?? "—"}</td>
+                  <td style={{ padding: "10px 14px", fontSize: 12, color: "#6B6860" }}>{c.programme}</td>
+                  <td style={{ padding: "10px 14px" }}><StatusBadge status={c.status as "qualify" | "borderline" | "no-qualify"} /></td>
+                  <td style={{ padding: "10px 14px", fontSize: 12, color: "#0D1F17", textAlign: "center" }}>{c.totalPasses ?? "—"}</td>
+                  <td style={{ padding: "10px 14px", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#0D1F17", textAlign: "center" }}>{c.bestSixAggregate ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
 
-        {filtered.length === 0 && (
+        {!loading && candidates.length === 0 && (
           <div style={{ padding: 48, textAlign: "center", color: "#6B6860" }}>
             <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.3 }}>⌕</div>
             <div style={{ fontSize: 14, fontWeight: 500 }}>No candidates found</div>
@@ -127,9 +185,31 @@ export default function CandidatesPage() {
           </div>
         )}
 
-        <div style={{ padding: "12px 16px", borderTop: "1px solid #E2E0D8", fontSize: 12, color: "#6B6860" }}>
-          Showing {filtered.length} candidates — click any row to view full results
-        </div>
+        {/* Pagination */}
+        {pagination && pagination.pages > 1 && (
+          <div style={{ padding: "12px 16px", borderTop: "1px solid #E2E0D8", fontSize: 12, color: "#6B6860", display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              style={{ padding: "4px 10px", borderRadius: 4, border: "1px solid #E2E0D8", background: "#fff", cursor: page <= 1 ? "not-allowed" : "pointer", opacity: page <= 1 ? 0.4 : 1 }}
+            >
+              ←
+            </button>
+            <span>Page {page} of {pagination.pages} · {total.toLocaleString()} candidates</span>
+            <button
+              disabled={page >= pagination.pages}
+              onClick={() => setPage((p) => p + 1)}
+              style={{ padding: "4px 10px", borderRadius: 4, border: "1px solid #E2E0D8", background: "#fff", cursor: page >= pagination.pages ? "not-allowed" : "pointer", opacity: page >= pagination.pages ? 0.4 : 1 }}
+            >
+              →
+            </button>
+          </div>
+        )}
+        {!pagination?.pages || pagination.pages <= 1 ? (
+          <div style={{ padding: "12px 16px", borderTop: "1px solid #E2E0D8", fontSize: 12, color: "#6B6860" }}>
+            {loading ? "" : `Showing ${candidates.length} candidates — click any row to view full results`}
+          </div>
+        ) : null}
       </div>
 
       {selected && <CandidatePanel candidate={selected} onClose={() => setSelected(null)} />}

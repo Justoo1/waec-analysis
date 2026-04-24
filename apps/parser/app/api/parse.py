@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 from typing import Any
 
@@ -10,6 +11,8 @@ from pydantic import BaseModel
 from app.workers.tasks import parse_file_task
 
 router = APIRouter()
+
+_SCHOOL_NUMBER_RE = re.compile(r"^\d{7}$")
 
 
 class ParseJobResponse(BaseModel):
@@ -28,6 +31,12 @@ async def upload_results(
     Accept a WAEC Results PDF or XLSX upload and queue a background parse job.
     Returns a task ID that the client can poll for progress.
     """
+    if not _SCHOOL_NUMBER_RE.match(school_number):
+        raise HTTPException(
+            status_code=400,
+            detail="school_number must be exactly 7 digits.",
+        )
+
     filename = file.filename or ""
     ext = filename.rsplit(".", 1)[-1].lower()
 
@@ -37,7 +46,7 @@ async def upload_results(
             detail="Only PDF and XLSX files are accepted.",
         )
 
-    # Write to a temp file so Celery can access it (worker reads from disk / MinIO)
+    # Write to a temp file so the Celery worker can read it from disk
     with tempfile.NamedTemporaryFile(
         suffix=f".{ext}", delete=False, dir="/tmp"
     ) as tmp:
@@ -65,8 +74,17 @@ async def task_status(task_id: str) -> dict[str, Any]:
     from app.workers.tasks import celery_app
 
     result = celery_app.AsyncResult(task_id)
+
+    # PROGRESS state stores meta in result.info; SUCCESS/FAILURE in result.result
+    if result.state == "PROGRESS":
+        payload = result.info
+    elif result.ready():
+        payload = result.result
+    else:
+        payload = None
+
     return {
         "task_id": task_id,
-        "status": result.status,
-        "result": result.result if result.ready() else None,
+        "status": result.state,
+        "result": payload,
     }
