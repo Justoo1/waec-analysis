@@ -1,0 +1,17 @@
+FROM node:24-alpine
+
+WORKDIR /app
+
+# Install deps first so they are cached as a separate layer
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Source is mounted as a volume at runtime — no COPY needed
+# node_modules stay in the image layer (anonymous volume prevents host overwrite)
+
+EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+ENV NEXT_TELEMETRY_DISABLED=1
+
+CMD ["npm", "run", "dev"]

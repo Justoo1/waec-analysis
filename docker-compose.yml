@@ -2,7 +2,7 @@ services:
   web:
     build:
       context: ./apps/web
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     ports:
       - "3000:3000"
     environment:
@@ -30,7 +30,7 @@ services:
   parser:
     build:
       context: ./apps/parser
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     ports:
       - "8000:8000"
     environment:
@@ -50,7 +50,7 @@ services:
   worker:
     build:
       context: ./apps/parser
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     command: celery -A app.workers.tasks worker --loglevel=info --concurrency=2
     environment:
       DATABASE_URL: postgresql://waec:waec@db:5432/waec_analytics

@@ -1,31 +1,21 @@
-import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
-import { YearOverYearChart } from "@/components/charts/YearOverYearChart";
-
-export default async function ComparePage() {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
-
-  // TODO: fetch multi-year data from getTenantDb(schoolNumber)
-  const hasMultipleYears = false;
-
-  if (!hasMultipleYears) {
-    return (
-      <div className="flex h-96 items-center justify-center p-6 text-center">
-        <div className="space-y-2">
-          <h1 className="text-xl font-semibold">Year-over-Year Comparison</h1>
-          <p className="text-sm text-muted-foreground">
-            Upload results for at least two years to enable comparisons.
-          </p>
+export default function ComparePage() {
+  return (
+    <div>
+      {/* Page header */}
+      <div style={{ display: "flex", alignItems: "flex-start", marginBottom: 24, paddingBottom: 20, borderBottom: "1px solid #E2E0D8" }}>
+        <div>
+          <h1 style={{ fontFamily: "'Lora', serif", fontSize: 26, fontWeight: 500, color: "#0D1F17", margin: 0 }}>
+            Year Comparison
+          </h1>
+          <div style={{ fontSize: 13, color: "#6B6860", marginTop: 4 }}>WASSCE year-over-year performance</div>
         </div>
       </div>
-    );
-  }
 
-  return (
-    <div className="space-y-6 p-6">
-      <h1 className="text-xl font-semibold">Year-over-Year Comparison</h1>
-      <YearOverYearChart data={[]} />
+      <div style={{ background: "#fff", borderRadius: 8, padding: 60, textAlign: "center", color: "#6B6860", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+        <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.25 }}>▥</div>
+        <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 6, color: "#0D1F17" }}>Coming soon</div>
+        <div style={{ fontSize: 13 }}>Upload results for at least two years to enable year-over-year comparison</div>
+      </div>
     </div>
   );
 }
