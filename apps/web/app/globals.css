@@ -142,6 +142,19 @@
   to   { transform: translateX(0);    opacity: 1; }
 }
 
+@media print {
+  aside { display: none !important; }
+  main {
+    padding: 24px !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+  body { background: white !important; }
+  .no-print { display: none !important; }
+  button { display: none !important; }
+  a[href="/results"] { display: none !important; }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

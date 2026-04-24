@@ -1,8 +1,9 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { signOut } from "next-auth/react";
 
 const NAV_ITEMS = [
   { href: "/",           icon: "▤",  label: "Overview" },
@@ -13,96 +14,88 @@ const NAV_ITEMS = [
   { href: "/upload",     icon: "⬆",  label: "Upload Results" },
 ];
 
-const YEARS = [2025, 2024, 2023];
-
 interface Props {
   userEmail: string;
+  schoolName: string;
+  schoolNumber: string;
 }
 
-export function Sidebar({ userEmail }: Props) {
+export function Sidebar({ userEmail, schoolName, schoolNumber }: Props) {
   const pathname = usePathname();
-  const [year, setYear] = useState(2025);
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const initials = userEmail
-    .split("@")[0]
-    .slice(0, 2)
-    .toUpperCase();
+  const currentYear = parseInt(searchParams.get("year") ?? "") || null;
+  const [years, setYears] = useState<number[]>([]);
+
+  useEffect(() => {
+    fetch("/api/sittings")
+      .then((r) => r.json())
+      .then((data) => {
+        const ys: number[] = (data.sittings ?? [])
+          .map((s: { year: number }) => s.year)
+          .sort((a: number, b: number) => b - a);
+        setYears(ys);
+      })
+      .catch(() => {});
+  }, []);
+
+  function handleYearChange(y: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("year", String(y));
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
+  // Build a nav href that preserves the current year param
+  function navHref(href: string) {
+    if (!currentYear) return href;
+    return `${href}?year=${currentYear}`;
+  }
+
+  const initials = userEmail.split("@")[0].slice(0, 2).toUpperCase();
 
   return (
     <aside
       style={{
-        width: 240,
-        flexShrink: 0,
-        background: "#0D1F17",
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        position: "sticky",
-        top: 0,
-        overflow: "hidden",
+        width: 240, flexShrink: 0, background: "#0D1F17",
+        display: "flex", flexDirection: "column",
+        height: "100vh", position: "sticky", top: 0, overflow: "hidden",
       }}
     >
       {/* School info */}
       <div style={{ padding: "24px 20px 20px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-        <div
-          style={{
-            width: 36, height: 36, borderRadius: 8,
-            background: "#1A6B47",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            marginBottom: 10, fontSize: 18, color: "#fff",
-          }}
-        >
+        <div style={{ width: 36, height: 36, borderRadius: 8, background: "#1A6B47", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10, fontSize: 18, color: "#fff" }}>
           ✦
         </div>
-        <div
-          style={{
-            color: "#fff", fontSize: 13, fontWeight: 600,
-            lineHeight: 1.35, fontFamily: "'Lora', serif",
-          }}
-        >
-          Archbishop Porter<br />Girls&apos; SHS
+        <div style={{ color: "#fff", fontSize: 13, fontWeight: 600, lineHeight: 1.35, fontFamily: "'Lora', serif" }}>
+          {schoolName || "—"}
         </div>
-        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, marginTop: 4 }}>
-          Code: 0040103
-        </div>
+        {schoolNumber && (
+          <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, marginTop: 4 }}>
+            Code: {schoolNumber}
+          </div>
+        )}
       </div>
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: "12px", overflowY: "auto" }}>
         {NAV_ITEMS.map((item) => {
-          const active = item.href === "/"
-            ? pathname === "/"
-            : pathname.startsWith(item.href);
+          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={navHref(item.href)}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                width: "100%",
-                padding: "9px 10px",
-                borderRadius: 6,
-                marginBottom: 2,
+                display: "flex", alignItems: "center", gap: 10, width: "100%",
+                padding: "9px 10px", borderRadius: 6, marginBottom: 2,
                 background: active ? "rgba(26,107,71,0.18)" : "transparent",
                 borderLeft: active ? "3px solid #1A6B47" : "3px solid transparent",
                 color: active ? "#fff" : "rgba(255,255,255,0.5)",
-                fontWeight: active ? 500 : 400,
-                fontSize: 13,
-                cursor: "pointer",
-                textDecoration: "none",
-                transition: "all 0.15s",
+                fontWeight: active ? 500 : 400, fontSize: 13,
+                cursor: "pointer", textDecoration: "none", transition: "all 0.15s",
               }}
             >
-              <span
-                style={{
-                  color: active ? "#1A6B47" : "rgba(255,255,255,0.3)",
-                  fontSize: 14,
-                  width: 18,
-                  textAlign: "center",
-                }}
-              >
+              <span style={{ color: active ? "#1A6B47" : "rgba(255,255,255,0.3)", fontSize: 14, width: 18, textAlign: "center" }}>
                 {item.icon}
               </span>
               {item.label}
@@ -113,13 +106,12 @@ export function Sidebar({ userEmail }: Props) {
         <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", margin: "8px 0" }} />
 
         <Link
-          href="/settings"
+          href={navHref("/settings")}
           style={{
-            display: "flex", alignItems: "center", gap: 10,
-            width: "100%", padding: "9px 10px", borderRadius: 6,
-            color: "rgba(255,255,255,0.5)", fontSize: 13,
-            textDecoration: "none",
-            borderLeft: "3px solid transparent",
+            display: "flex", alignItems: "center", gap: 10, width: "100%",
+            padding: "9px 10px", borderRadius: 6,
+            color: pathname === "/settings" ? "#fff" : "rgba(255,255,255,0.5)",
+            fontSize: 13, textDecoration: "none", borderLeft: "3px solid transparent",
           }}
         >
           <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 14, width: 18, textAlign: "center" }}>⚙</span>
@@ -130,56 +122,45 @@ export function Sidebar({ userEmail }: Props) {
       {/* Year + User */}
       <div style={{ padding: "16px", borderTop: "1px solid rgba(255,255,255,0.07)" }}>
         <div style={{ marginBottom: 12 }}>
-          <label
-            style={{
-              color: "rgba(255,255,255,0.4)", fontSize: 10,
-              textTransform: "uppercase", letterSpacing: "0.08em",
-              display: "block", marginBottom: 4,
-            }}
-          >
+          <label style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 4 }}>
             Exam Year
           </label>
-          <select
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            style={{
-              background: "rgba(255,255,255,0.08)",
-              color: "#fff",
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: 5,
-              padding: "5px 10px",
-              fontSize: 13,
-              width: "100%",
-              cursor: "pointer",
-            }}
-          >
-            {YEARS.map((y) => (
-              <option key={y} value={y} style={{ background: "#0D1F17" }}>
-                WASSCE {y}
-              </option>
-            ))}
-          </select>
+          {years.length === 0 ? (
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", padding: "5px 0" }}>No data uploaded</div>
+          ) : (
+            <select
+              value={currentYear ?? years[0]}
+              onChange={(e) => handleYearChange(Number(e.target.value))}
+              style={{
+                background: "rgba(255,255,255,0.08)", color: "#fff",
+                border: "1px solid rgba(255,255,255,0.12)", borderRadius: 5,
+                padding: "5px 10px", fontSize: 13, width: "100%", cursor: "pointer",
+              }}
+            >
+              {years.map((y) => (
+                <option key={y} value={y} style={{ background: "#0D1F17" }}>
+                  WASSCE {y}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div
-            style={{
-              width: 30, height: 30, borderRadius: "50%",
-              background: "#1A6B47",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#fff", fontSize: 12, fontWeight: 600, flexShrink: 0,
-            }}
-          >
+          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#1A6B47", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
             {initials}
           </div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ color: "#fff", fontSize: 12, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              Head Admin
-            </div>
-            <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {userEmail}
-            </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ color: "#fff", fontSize: 12, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Head Admin</div>
+            <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userEmail}</div>
           </div>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            title="Sign out"
+            style={{ background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.35)", fontSize: 16, padding: "4px", flexShrink: 0, lineHeight: 1 }}
+          >
+            ⏻
+          </button>
         </div>
       </div>
     </aside>

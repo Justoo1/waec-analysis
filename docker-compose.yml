@@ -40,6 +40,9 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-waec-uploads}
+      UPLOAD_TMP_DIR: /shared
+    volumes:
+      - parser_uploads:/shared
     depends_on:
       db:
         condition: service_healthy
@@ -51,7 +54,7 @@ services:
     build:
       context: ./apps/parser
       dockerfile: Dockerfile.prod
-    command: celery -A app.workers.tasks worker --loglevel=info --concurrency=2
+    command: celery -A app.workers.tasks worker --loglevel=info --concurrency=2 -Q parsing,qualification,celery
     environment:
       DATABASE_URL: postgresql://waec:waec@db:5432/waec_analytics
       REDIS_URL: redis://redis:6379/0
@@ -59,6 +62,9 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-waec-uploads}
+      UPLOAD_TMP_DIR: /shared
+    volumes:
+      - parser_uploads:/shared
     depends_on:
       db:
         condition: service_healthy
@@ -119,3 +125,4 @@ volumes:
   pgdata:
   redis_data:
   minio_data:
+  parser_uploads:

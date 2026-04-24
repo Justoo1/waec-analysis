@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { Subject } from "@/lib/mock-data";
 import { GRADE_COLORS, GRADE_ORDER } from "@/lib/mock-data";
 import { HorizontalBar } from "@/components/charts/HorizontalBar";
@@ -16,19 +17,47 @@ const TH_STYLE: React.CSSProperties = {
 const TH_CENTER: React.CSSProperties = { ...TH_STYLE, textAlign: "center", padding: "10px 4px" };
 
 export default function SubjectsPage() {
+  const searchParams = useSearchParams();
+  const yearParam = searchParams.get("year");
+
   const [sort, setSort] = useState<"passRate" | "name">("passRate");
   const [modal, setModal] = useState<Subject | null>(null);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
 
+  function handleExportCsv() {
+    const header = ["Subject", "Candidates", "A1", "B2", "B3", "C4", "C5", "C6", "D7", "E8", "F9", "Pass %", "Fail %"];
+    const lines = [
+      header.join(","),
+      ...subjects.map((s) => [
+        `"${s.name.replace(/"/g, '""')}"`,
+        s.cands,
+        s.grades.A1, s.grades.B2, s.grades.B3, s.grades.C4, s.grades.C5, s.grades.C6,
+        s.grades.D7, s.grades.E8, s.grades.F9,
+        s.passRate.toFixed(1),
+        (100 - s.passRate).toFixed(1),
+      ].join(",")),
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "subjects.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   useEffect(() => {
-    fetch("/api/subjects")
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (yearParam) params.set("year", yearParam);
+    fetch(`/api/subjects?${params}`)
       .then((r) => r.json())
       .then((data) => {
         const mapped: Subject[] = (data.subjects ?? []).map(
           (s: { name: string; cands: number; passRate: number; grades: Subject["grades"] }) => ({
             name: s.name,
-            code: s.name.slice(0, 6).toUpperCase(),
+            code: s.name,
             cands: s.cands,
             passRate: s.passRate,
             grades: s.grades,
@@ -38,7 +67,7 @@ export default function SubjectsPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [yearParam]);
 
   const sorted = [...subjects].sort((a, b) =>
     sort === "passRate" ? b.passRate - a.passRate : a.name.localeCompare(b.name)
@@ -52,6 +81,19 @@ export default function SubjectsPage() {
           <h1 style={{ fontFamily: "'Lora', serif", fontSize: 26, fontWeight: 500, color: "#0D1F17", margin: 0 }}>Subject Analysis</h1>
           <div style={{ fontSize: 13, color: "#6B6860", marginTop: 4 }}>All subjects · pass rates and grade distributions</div>
         </div>
+        <button
+          onClick={handleExportCsv}
+          disabled={subjects.length === 0}
+          className="no-print"
+          style={{
+            padding: "8px 16px", borderRadius: 6, fontSize: 13, fontWeight: 500,
+            background: "#fff", border: "1px solid #E2E0D8", cursor: "pointer",
+            color: "#0D1F17", display: "flex", alignItems: "center", gap: 6,
+            opacity: subjects.length === 0 ? 0.5 : 1,
+          }}
+        >
+          ↓ Export CSV
+        </button>
       </div>
 
       {/* Sort control */}
@@ -83,7 +125,7 @@ export default function SubjectsPage() {
               <div style={{ fontSize: 11, color: "#C07818" }}>│ 90% target line</div>
             </div>
             {sorted.map((s) => (
-              <HorizontalBar key={s.code} label={s.name} value={s.passRate} max={100} target={90} warn />
+              <HorizontalBar key={s.name} label={s.name} value={s.passRate} max={100} target={90} warn />
             ))}
           </div>
 
@@ -107,7 +149,7 @@ export default function SubjectsPage() {
                   const passColor = s.passRate < 85 ? "#B83232" : s.passRate < 90 ? "#C07818" : "#1A6B47";
                   return (
                     <tr
-                      key={s.code}
+                      key={s.name}
                       onClick={() => setModal(s)}
                       style={{ background: i % 2 === 0 ? "#fff" : "#FAFAF8", borderBottom: "1px solid #E2E0D8", cursor: "pointer" }}
                       onMouseEnter={(e) => (e.currentTarget.style.background = "#EEF6F2")}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { CandidatePanel } from "@/components/CandidatePanel";
 import type { Candidate } from "@/lib/mock-data";
@@ -47,6 +48,9 @@ function toCandidateShape(c: ApiCandidate): Candidate {
 }
 
 export default function CandidatesPage() {
+  const searchParams = useSearchParams();
+  const yearParam = searchParams.get("year");
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [progFilter, setProgFilter] = useState("all");
@@ -57,6 +61,8 @@ export default function CandidatesPage() {
   const [programmes, setProgrammes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Candidate | null>(null);
+  const [selectedId, setSelectedId] = useState<number | undefined>(undefined);
+  const [exporting, setExporting] = useState(false);
 
   const fetchCandidates = useCallback(async () => {
     setLoading(true);
@@ -64,6 +70,7 @@ export default function CandidatesPage() {
     if (search) params.set("search", search);
     if (statusFilter !== "all") params.set("status", statusFilter);
     if (progFilter !== "all") params.set("programme", progFilter);
+    if (yearParam) params.set("year", yearParam);
 
     try {
       const resp = await fetch(`/api/candidates?${params}`);
@@ -82,7 +89,10 @@ export default function CandidatesPage() {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, statusFilter, progFilter, page]);
+  }, [search, statusFilter, progFilter, page, yearParam]);
+
+  // Reset to page 1 when year filter changes
+  useEffect(() => { setPage(1); }, [yearParam]);
 
   useEffect(() => {
     const timeout = setTimeout(fetchCandidates, search ? 300 : 0);
@@ -96,6 +106,39 @@ export default function CandidatesPage() {
       .catch(() => {});
   }, []);
 
+  async function handleExportCsv() {
+    setExporting(true);
+    try {
+      const resp = await fetch("/api/candidates?limit=10000");
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const rows: ApiCandidate[] = data.candidates ?? [];
+      const header = ["Index Number", "Full Name", "Gender", "Date of Birth", "Programme", "Status", "Total Passes", "Best-Six Aggregate"];
+      const lines = [
+        header.join(","),
+        ...rows.map((c) => [
+          c.indexNumber,
+          `"${(c.fullName ?? "").replace(/"/g, '""')}"`,
+          c.gender === "F" ? "Female" : "Male",
+          c.dateOfBirth ?? "",
+          `"${(c.programme ?? "").replace(/"/g, '""')}"`,
+          c.status,
+          c.totalPasses ?? "",
+          c.bestSixAggregate ?? "",
+        ].join(",")),
+      ];
+      const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "candidates.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const total = pagination?.total ?? 0;
 
   return (
@@ -108,6 +151,19 @@ export default function CandidatesPage() {
             {total > 0 ? `${total.toLocaleString()} total candidates` : "Loading…"}
           </div>
         </div>
+        <button
+          onClick={handleExportCsv}
+          disabled={exporting || candidates.length === 0}
+          className="no-print"
+          style={{
+            padding: "8px 16px", borderRadius: 6, fontSize: 13, fontWeight: 500,
+            background: "#fff", border: "1px solid #E2E0D8", cursor: "pointer",
+            color: "#0D1F17", display: "flex", alignItems: "center", gap: 6,
+            opacity: exporting || candidates.length === 0 ? 0.5 : 1,
+          }}
+        >
+          ↓ {exporting ? "Exporting…" : "Export CSV"}
+        </button>
       </div>
 
       {/* Filters */}
@@ -158,7 +214,7 @@ export default function CandidatesPage() {
               {candidates.map((c, i) => (
                 <tr
                   key={c.id}
-                  onClick={() => setSelected(toCandidateShape(c))}
+                  onClick={() => { setSelected(toCandidateShape(c)); setSelectedId(c.id); }}
                   style={{ background: i % 2 === 0 ? "#fff" : "#FAFAF8", cursor: "pointer", borderBottom: "1px solid #E2E0D8" }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = "#EEF6F2")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#FAFAF8")}
@@ -212,7 +268,7 @@ export default function CandidatesPage() {
         ) : null}
       </div>
 
-      {selected && <CandidatePanel candidate={selected} onClose={() => setSelected(null)} />}
+      {selected && <CandidatePanel candidate={selected} candidateId={selectedId} onClose={() => { setSelected(null); setSelectedId(undefined); }} />}
     </div>
   );
 }

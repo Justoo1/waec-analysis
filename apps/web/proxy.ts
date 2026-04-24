@@ -35,8 +35,19 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // ── 2. No tenant subdomain → serve main domain normally ──────────────────
+  // ── 2. No tenant subdomain → main domain; gate /admin to super_admin only ─
   if (!subdomain) {
+    if (pathname.startsWith("/admin")) {
+      const session = await auth();
+      if (!session?.user) {
+        const loginUrl = new URL("/login", request.url);
+        loginUrl.searchParams.set("callbackUrl", pathname);
+        return NextResponse.redirect(loginUrl);
+      }
+      if (session.user.role !== "super_admin") {
+        return NextResponse.redirect(new URL("/", request.url));
+      }
+    }
     return NextResponse.next();
   }
 

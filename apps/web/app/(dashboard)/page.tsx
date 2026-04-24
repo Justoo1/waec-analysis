@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { sql, count, desc } from "drizzle-orm";
+import { sql, count, desc, eq } from "drizzle-orm";
 import { getTenantDb } from "@/lib/db/tenant";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { DonutChart } from "@/components/charts/DonutChart";
@@ -8,12 +8,23 @@ import { CoreSubjectChart } from "@/components/charts/CoreSubjectChart";
 import Link from "next/link";
 import type { Subject } from "@/lib/mock-data";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string }>;
+}) {
   const session = await auth();
-  if (!session?.user?.schoolNumber) redirect("/login");
+  if (!session?.user) redirect("/login");
+  if (!session.user.schoolNumber) {
+    if (session.user.role === "super_admin") redirect("/admin");
+    redirect("/login");
+  }
+
+  const { year: yearStr } = await searchParams;
+  const selectedYear = yearStr ? parseInt(yearStr) : null;
 
   const { db: tdb, schema: s, close } = await getTenantDb(session.user.schoolNumber);
-  const { qualificationFlags: qf, results: r, examSittings: es } = s;
+  const { qualificationFlags: qf, results: r, examSittings: es, candidates: c } = s;
 
   let stats = {
     totalCandidates: 0, qualifiers: 0, borderline: 0, noQualify: 0,
@@ -24,40 +35,48 @@ export default async function DashboardPage() {
   let subjects: Subject[] = [];
 
   try {
-    const [qualCounts] = await tdb
-      .select({
-        qualifies: sql<string>`SUM(CASE WHEN ${qf.qualifiesUniversity} = true THEN 1 ELSE 0 END)`,
-        borderline: sql<string>`SUM(CASE WHEN ${qf.qualifiesUniversity} = false AND ${qf.totalPasses} >= 5 THEN 1 ELSE 0 END)`,
-        noQualify: sql<string>`SUM(CASE WHEN ${qf.qualifiesUniversity} = false AND ${qf.totalPasses} < 5 THEN 1 ELSE 0 END)`,
-        total: count(),
-      })
-      .from(qf);
+    // Resolve sittingId for the selected year (if any)
+    let sittingId: number | null = null;
+    if (selectedYear) {
+      const [sitting] = await tdb.select({ id: es.id }).from(es).where(eq(es.year, selectedYear)).limit(1);
+      sittingId = sitting?.id ?? null;
+    }
 
-    const [passRow] = await tdb
-      .select({
-        passes: sql<string>`SUM(CASE WHEN ${r.grade} IN ('A1','B2','B3','C4','C5','C6') THEN 1 ELSE 0 END)`,
-        total: count(),
-      })
-      .from(r);
+    const qualCountsCols = {
+      qualifies: sql<string>`SUM(CASE WHEN ${qf.qualifiesUniversity} = true THEN 1 ELSE 0 END)`,
+      borderline: sql<string>`SUM(CASE WHEN ${qf.qualifiesUniversity} = false AND ${qf.totalPasses} >= 5 THEN 1 ELSE 0 END)`,
+      noQualify: sql<string>`SUM(CASE WHEN ${qf.qualifiesUniversity} = false AND ${qf.totalPasses} < 5 THEN 1 ELSE 0 END)`,
+      total: count(),
+    };
+    const [qualCounts] = await (sittingId
+      ? tdb.select(qualCountsCols).from(qf).innerJoin(c, eq(qf.candidateId, c.id)).where(eq(c.sittingId, sittingId))
+      : tdb.select(qualCountsCols).from(qf));
 
-    const subjectRates = await tdb
-      .select({
-        subject: r.subject,
-        passes: sql<string>`SUM(CASE WHEN ${r.grade} IN ('A1','B2','B3','C4','C5','C6') THEN 1 ELSE 0 END)`,
-        total: count(),
-        A1: sql<string>`SUM(CASE WHEN ${r.grade} = 'A1' THEN 1 ELSE 0 END)`,
-        B2: sql<string>`SUM(CASE WHEN ${r.grade} = 'B2' THEN 1 ELSE 0 END)`,
-        B3: sql<string>`SUM(CASE WHEN ${r.grade} = 'B3' THEN 1 ELSE 0 END)`,
-        C4: sql<string>`SUM(CASE WHEN ${r.grade} = 'C4' THEN 1 ELSE 0 END)`,
-        C5: sql<string>`SUM(CASE WHEN ${r.grade} = 'C5' THEN 1 ELSE 0 END)`,
-        C6: sql<string>`SUM(CASE WHEN ${r.grade} = 'C6' THEN 1 ELSE 0 END)`,
-        D7: sql<string>`SUM(CASE WHEN ${r.grade} = 'D7' THEN 1 ELSE 0 END)`,
-        E8: sql<string>`SUM(CASE WHEN ${r.grade} = 'E8' THEN 1 ELSE 0 END)`,
-        F9: sql<string>`SUM(CASE WHEN ${r.grade} = 'F9' THEN 1 ELSE 0 END)`,
-      })
-      .from(r)
-      .groupBy(r.subject)
-      .having(sql`COUNT(*) >= 5`);
+    const passRowCols = {
+      passes: sql<string>`SUM(CASE WHEN ${r.grade} IN ('A1','B2','B3','C4','C5','C6') THEN 1 ELSE 0 END)`,
+      total: count(),
+    };
+    const [passRow] = await (sittingId
+      ? tdb.select(passRowCols).from(r).innerJoin(c, eq(r.candidateId, c.id)).where(eq(c.sittingId, sittingId))
+      : tdb.select(passRowCols).from(r));
+
+    const subjectCols = {
+      subject: r.subject,
+      passes: sql<string>`SUM(CASE WHEN ${r.grade} IN ('A1','B2','B3','C4','C5','C6') THEN 1 ELSE 0 END)`,
+      total: count(),
+      A1: sql<string>`SUM(CASE WHEN ${r.grade} = 'A1' THEN 1 ELSE 0 END)`,
+      B2: sql<string>`SUM(CASE WHEN ${r.grade} = 'B2' THEN 1 ELSE 0 END)`,
+      B3: sql<string>`SUM(CASE WHEN ${r.grade} = 'B3' THEN 1 ELSE 0 END)`,
+      C4: sql<string>`SUM(CASE WHEN ${r.grade} = 'C4' THEN 1 ELSE 0 END)`,
+      C5: sql<string>`SUM(CASE WHEN ${r.grade} = 'C5' THEN 1 ELSE 0 END)`,
+      C6: sql<string>`SUM(CASE WHEN ${r.grade} = 'C6' THEN 1 ELSE 0 END)`,
+      D7: sql<string>`SUM(CASE WHEN ${r.grade} = 'D7' THEN 1 ELSE 0 END)`,
+      E8: sql<string>`SUM(CASE WHEN ${r.grade} = 'E8' THEN 1 ELSE 0 END)`,
+      F9: sql<string>`SUM(CASE WHEN ${r.grade} = 'F9' THEN 1 ELSE 0 END)`,
+    };
+    const subjectRates = await (sittingId
+      ? tdb.select(subjectCols).from(r).innerJoin(c, eq(r.candidateId, c.id)).where(eq(c.sittingId, sittingId)).groupBy(r.subject).having(sql`COUNT(*) >= 5`)
+      : tdb.select(subjectCols).from(r).groupBy(r.subject).having(sql`COUNT(*) >= 5`));
 
     const [latest] = await tdb
       .select({ year: es.year, parsedAt: es.parsedAt })
@@ -96,9 +115,11 @@ export default async function DashboardPage() {
       qualifyPct: pct(qualifiers), borderlinePct: pct(borderline), noQualifyPct: pct(noQualify),
       overallPassRate: totalResults > 0 ? parseFloat(((passes / totalResults) * 100).toFixed(1)) : 0,
       bestSubject,
-      latestYear: latest?.year ?? null,
+      latestYear: selectedYear ?? latest?.year ?? null,
       lastUpdated: latest?.parsedAt ?? null,
     };
+  } catch {
+    // Schema not provisioned yet (no uploads) — stats stay at zero defaults, showing the empty state
   } finally {
     await close();
   }

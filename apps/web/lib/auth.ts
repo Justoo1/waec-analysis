@@ -39,16 +39,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const { compare } = await import("bcryptjs");
         if (!(await compare(password, user.passwordHash ?? ""))) return null;
 
-        // Fetch the school's subdomain-routable identifier
+        // Fetch the school's subdomain-routable identifier and display name
         let schoolNumber: string | null = null;
+        let schoolName: string | null = null;
         if (user.schoolId) {
           const school = await db
-            .select({ schoolNumber: schools.schoolNumber })
+            .select({ schoolNumber: schools.schoolNumber, name: schools.name })
             .from(schools)
             .where(eq(schools.id, user.schoolId))
             .limit(1)
             .then((r) => r[0]);
           schoolNumber = school?.schoolNumber ?? null;
+          schoolName = school?.name ?? null;
         }
 
         return {
@@ -58,6 +60,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           role: user.role,
           schoolId: user.schoolId,
           schoolNumber,
+          schoolName,
         };
       },
     }),
@@ -68,6 +71,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.role = (user as { role?: string | null }).role;
         token.schoolId = (user as { schoolId?: number | null }).schoolId;
         token.schoolNumber = (user as { schoolNumber?: string | null }).schoolNumber;
+        token.schoolName = (user as { schoolName?: string | null }).schoolName;
       }
       return token;
     },
@@ -75,6 +79,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.role = token.role as string;
       session.user.schoolId = token.schoolId as number | null;
       session.user.schoolNumber = token.schoolNumber as string | null;
+      session.user.schoolName = token.schoolName as string | null;
       return session;
     },
   },
@@ -94,6 +99,7 @@ declare module "next-auth" {
       role: string;
       schoolId: number | null;
       schoolNumber: string | null;
+      schoolName: string | null;
     };
   }
 }

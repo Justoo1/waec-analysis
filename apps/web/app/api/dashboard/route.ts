@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql, count, desc } from "drizzle-orm";
-import { resolveTenantContext } from "@/lib/api-utils";
+import { resolveTenantContext, isMissingSchemaError } from "@/lib/api-utils";
 
 export async function GET() {
   const { context, error } = await resolveTenantContext();
@@ -79,6 +79,15 @@ export async function GET() {
       lastUpdated: latest?.parsedAt ?? null,
       latestYear: latest?.year ?? null,
     });
+  } catch (err: unknown) {
+    if (isMissingSchemaError(err)) {
+      return NextResponse.json({
+        totalCandidates: 0, qualifiers: 0, borderline: 0, noQualify: 0,
+        qualifyPct: 0, borderlinePct: 0, noQualifyPct: 0,
+        overallPassRate: 0, bestSubject: null, lastUpdated: null, latestYear: null,
+      });
+    }
+    throw err;
   } finally {
     await close();
   }

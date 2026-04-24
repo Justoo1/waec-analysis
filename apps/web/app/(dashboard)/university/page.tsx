@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { and, asc, count, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { getTenantDb } from "@/lib/db/tenant";
 import { AggBar } from "@/components/charts/AggBar";
 import Link from "next/link";
@@ -11,12 +11,23 @@ const TH_STYLE: React.CSSProperties = {
   textTransform: "uppercase", letterSpacing: "0.07em",
 };
 
-export default async function UniversityPage() {
+export default async function UniversityPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string }>;
+}) {
   const session = await auth();
-  if (!session?.user?.schoolNumber) redirect("/login");
+  if (!session?.user) redirect("/login");
+  if (!session.user.schoolNumber) {
+    if (session.user.role === "super_admin") redirect("/admin");
+    redirect("/login");
+  }
+
+  const { year: yearStr } = await searchParams;
+  const selectedYear = yearStr ? parseInt(yearStr) : null;
 
   const { db: tdb, schema: s, close } = await getTenantDb(session.user.schoolNumber);
-  const { qualificationFlags: qf, candidates: c } = s;
+  const { qualificationFlags: qf, candidates: c, examSittings: es } = s;
 
   let summary = { totalCandidates: 0, qualifiers: 0, borderline: 0, noQualify: 0, qualifyPct: 0, borderlinePct: 0, noQualifyPct: 0 };
   let byProgramme: { name: string; qualify: number; total: number; pct: number }[] = [];
@@ -24,14 +35,24 @@ export default async function UniversityPage() {
   let borderlineCands: { id: number; indexNumber: string; fullName: string | null; programme: string | null; totalPasses: number | null }[] = [];
 
   try {
-    const [counts] = await tdb
-      .select({
-        qualifiers: sql<string>`SUM(CASE WHEN ${qf.qualifiesUniversity} = true THEN 1 ELSE 0 END)`,
-        borderline: sql<string>`SUM(CASE WHEN ${qf.qualifiesUniversity} = false AND ${qf.totalPasses} >= 5 THEN 1 ELSE 0 END)`,
-        noQualify: sql<string>`SUM(CASE WHEN ${qf.qualifiesUniversity} = false AND ${qf.totalPasses} < 5 THEN 1 ELSE 0 END)`,
-        total: count(),
-      })
-      .from(qf);
+    // Resolve sittingId for the selected year (if any)
+    let sittingId: number | null = null;
+    if (selectedYear) {
+      const [sitting] = await tdb.select({ id: es.id }).from(es).where(eq(es.year, selectedYear)).limit(1);
+      sittingId = sitting?.id ?? null;
+    }
+
+    const yearWhere = sittingId ? eq(c.sittingId, sittingId) : undefined;
+
+    const countsCols = {
+      qualifiers: sql<string>`SUM(CASE WHEN ${qf.qualifiesUniversity} = true THEN 1 ELSE 0 END)`,
+      borderline: sql<string>`SUM(CASE WHEN ${qf.qualifiesUniversity} = false AND ${qf.totalPasses} >= 5 THEN 1 ELSE 0 END)`,
+      noQualify: sql<string>`SUM(CASE WHEN ${qf.qualifiesUniversity} = false AND ${qf.totalPasses} < 5 THEN 1 ELSE 0 END)`,
+      total: count(),
+    };
+    const [counts] = await (sittingId
+      ? tdb.select(countsCols).from(qf).innerJoin(c, eq(qf.candidateId, c.id)).where(yearWhere)
+      : tdb.select(countsCols).from(qf));
 
     const prog = await tdb
       .select({
@@ -41,20 +62,28 @@ export default async function UniversityPage() {
       })
       .from(c)
       .innerJoin(qf, eq(qf.candidateId, c.id))
+      .where(yearWhere)
       .groupBy(c.programme);
 
-    const agg = await tdb
-      .select({ agg: qf.bestSixAggregate, count: count() })
-      .from(qf)
-      .where(isNotNull(qf.bestSixAggregate))
-      .groupBy(qf.bestSixAggregate)
-      .orderBy(asc(qf.bestSixAggregate));
+    const aggCols = { agg: qf.bestSixAggregate, count: count() };
+    const agg = await (sittingId
+      ? tdb.select(aggCols).from(qf)
+          .innerJoin(c, eq(qf.candidateId, c.id))
+          .where(and(isNotNull(qf.bestSixAggregate), yearWhere))
+          .groupBy(qf.bestSixAggregate).orderBy(asc(qf.bestSixAggregate))
+      : tdb.select(aggCols).from(qf)
+          .where(isNotNull(qf.bestSixAggregate))
+          .groupBy(qf.bestSixAggregate).orderBy(asc(qf.bestSixAggregate)));
+
+    const borderlineWhere = sittingId
+      ? and(eq(qf.qualifiesUniversity, false), gte(qf.totalPasses, 5), yearWhere)
+      : and(eq(qf.qualifiesUniversity, false), gte(qf.totalPasses, 5));
 
     const borderline = await tdb
       .select({ id: c.id, indexNumber: c.indexNumber, fullName: c.fullName, programme: c.programme, totalPasses: qf.totalPasses })
       .from(c)
       .innerJoin(qf, eq(qf.candidateId, c.id))
-      .where(and(eq(qf.qualifiesUniversity, false), gte(qf.totalPasses, 5)))
+      .where(borderlineWhere)
       .orderBy(asc(qf.totalPasses))
       .limit(20);
 
@@ -72,6 +101,8 @@ export default async function UniversityPage() {
     });
     aggDistribution = agg.map((a) => ({ agg: a.agg, count: parseInt(String(a.count)) }));
     borderlineCands = borderline;
+  } catch {
+    // Schema not provisioned yet — stay at zero defaults
   } finally {
     await close();
   }

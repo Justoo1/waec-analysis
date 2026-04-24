@@ -46,9 +46,12 @@ async def upload_results(
             detail="Only PDF and XLSX files are accepted.",
         )
 
-    # Write to a temp file so the Celery worker can read it from disk
+    # Write to a temp file so the Celery worker can read it from disk.
+    # /shared is a named volume mounted in both the parser and worker containers.
+    upload_dir = os.environ.get("UPLOAD_TMP_DIR", "/tmp")
+    os.makedirs(upload_dir, exist_ok=True)
     with tempfile.NamedTemporaryFile(
-        suffix=f".{ext}", delete=False, dir="/tmp"
+        suffix=f".{ext}", delete=False, dir=upload_dir
     ) as tmp:
         content = await file.read()
         tmp.write(content)

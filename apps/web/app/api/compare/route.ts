@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { count, eq, inArray, sql } from "drizzle-orm";
-import { resolveTenantContext } from "@/lib/api-utils";
+import { resolveTenantContext, isMissingSchemaError } from "@/lib/api-utils";
 
 export async function GET(request: Request) {
   const { context, error } = await resolveTenantContext();
@@ -54,6 +54,9 @@ export async function GET(request: Request) {
       data: [...pivot.values()],
       years: years.map(String),
     });
+  } catch (err: unknown) {
+    if (isMissingSchemaError(err)) return NextResponse.json({ data: [], years: years.map(String) });
+    throw err;
   } finally {
     await close();
   }

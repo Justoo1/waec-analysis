@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { resolveTenantContext } from "@/lib/api-utils";
+import { resolveTenantContext, isMissingSchemaError } from "@/lib/api-utils";
 
 export async function GET(
   _req: Request,
@@ -40,6 +40,11 @@ export async function GET(
       results,
       qualificationFlags: flags[0] ?? null,
     });
+  } catch (err: unknown) {
+    if (isMissingSchemaError(err)) {
+      return NextResponse.json({ error: "Candidate not found" }, { status: 404 });
+    }
+    throw err;
   } finally {
     await close();
   }

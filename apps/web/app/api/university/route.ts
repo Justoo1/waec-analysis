@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { and, asc, count, eq, gte, isNotNull, sql } from "drizzle-orm";
-import { resolveTenantContext } from "@/lib/api-utils";
+import { resolveTenantContext, isMissingSchemaError } from "@/lib/api-utils";
 
 export async function GET() {
   const { context, error } = await resolveTenantContext();
@@ -99,6 +99,20 @@ export async function GET() {
       })),
       borderlineCandidates: borderlineCands,
     });
+  } catch (err: unknown) {
+    if (isMissingSchemaError(err)) {
+      return NextResponse.json({
+        summary: {
+          totalCandidates: 0, qualifiers: 0, borderline: 0, noQualify: 0,
+          qualifyPct: 0, borderlinePct: 0, noQualifyPct: 0,
+          qualifiesScience: 0, qualifiesBusiness: 0, qualifiesArts: 0,
+        },
+        byProgramme: [],
+        aggDistribution: [],
+        borderlineCandidates: [],
+      });
+    }
+    throw err;
   } finally {
     await close();
   }

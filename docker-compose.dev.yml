@@ -29,17 +29,23 @@ services:
     build:
       context: ./apps/parser
       dockerfile: Dockerfile.dev
+    environment:
+      UPLOAD_TMP_DIR: /shared
     volumes:
       - ./apps/parser:/app       # live source sync for --reload
+      - parser_uploads:/shared
     restart: "no"
 
   worker:
     build:
       context: ./apps/parser
       dockerfile: Dockerfile.dev
-    command: celery -A app.workers.tasks worker --loglevel=debug --concurrency=1
+    command: celery -A app.workers.tasks worker --loglevel=debug --concurrency=1 -Q parsing,qualification,celery
+    environment:
+      UPLOAD_TMP_DIR: /shared
     volumes:
       - ./apps/parser:/app
+      - parser_uploads:/shared
     restart: "no"
 
   # Disable nginx in dev — access services directly on their ports
@@ -50,3 +56,4 @@ services:
 volumes:
   web_node_modules:
   web_next:
+  parser_uploads:

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { and, asc, count, eq, gte, ilike, lt, or, sql } from "drizzle-orm";
-import { resolveTenantContext } from "@/lib/api-utils";
+import { resolveTenantContext, isMissingSchemaError } from "@/lib/api-utils";
 
 export async function GET(request: Request) {
   const { context, error } = await resolveTenantContext();
@@ -15,9 +15,22 @@ export async function GET(request: Request) {
   const search = searchParams.get("search") ?? "";
   const status = searchParams.get("status") ?? "";
   const programme = searchParams.get("programme") ?? "";
+  const yearParam = searchParams.get("year");
+  const year = yearParam ? parseInt(yearParam) : null;
 
   try {
+    // Resolve sittingId for year filter
+    let sittingId: number | null = null;
+    if (year) {
+      const [sitting] = await tdb.select({ id: s.examSittings.id })
+        .from(s.examSittings)
+        .where(eq(s.examSittings.year, year))
+        .limit(1);
+      sittingId = sitting?.id ?? null;
+    }
+
     const conditions = [];
+    if (sittingId) conditions.push(eq(c.sittingId, sittingId));
 
     if (search) {
       conditions.push(
@@ -91,6 +104,14 @@ export async function GET(request: Request) {
         pages: Math.ceil(parseInt(String(total)) / limit),
       },
     });
+  } catch (err: unknown) {
+    if (isMissingSchemaError(err)) {
+      return NextResponse.json({
+        candidates: [],
+        pagination: { page, limit, total: 0, pages: 0 },
+      });
+    }
+    throw err;
   } finally {
     await close();
   }

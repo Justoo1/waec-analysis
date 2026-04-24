@@ -14,6 +14,14 @@ type TenantResult =
   | { context: null; error: NextResponse };
 
 /**
+ * Returns true if the error is a PostgreSQL "relation does not exist" (42P01).
+ * Use this to return empty data instead of a 500 for tenants with no schema yet.
+ */
+export function isMissingSchemaError(err: unknown): boolean {
+  return (err as { cause?: { code?: string } })?.cause?.code === "42P01";
+}
+
+/**
  * Resolves the authenticated tenant context for an API route handler.
  * The caller MUST call tenantDb.close() in a finally block to prevent
  * connection pool leaks.

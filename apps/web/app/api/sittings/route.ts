@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { desc } from "drizzle-orm";
-import { resolveTenantContext } from "@/lib/api-utils";
+import { resolveTenantContext, isMissingSchemaError } from "@/lib/api-utils";
 
 export async function GET() {
   const { context, error } = await resolveTenantContext();
@@ -15,6 +15,9 @@ export async function GET() {
       .orderBy(desc(s.examSittings.year));
 
     return NextResponse.json({ sittings });
+  } catch (err: unknown) {
+    if (isMissingSchemaError(err)) return NextResponse.json({ sittings: [] });
+    throw err;
   } finally {
     await close();
   }

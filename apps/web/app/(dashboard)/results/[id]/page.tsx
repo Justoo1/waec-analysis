@@ -5,6 +5,7 @@ import { getTenantDb } from "@/lib/db/tenant";
 import { GradeBadge } from "@/components/ui/GradeBadge";
 import type { Grade } from "@/lib/mock-data";
 import Link from "next/link";
+import { PrintButton } from "./PrintButton";
 
 export default async function CandidateDetailPage({
   params,
@@ -12,7 +13,11 @@ export default async function CandidateDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const session = await auth();
-  if (!session?.user?.schoolNumber) redirect("/login");
+  if (!session?.user) redirect("/login");
+  if (!session.user.schoolNumber) {
+    if (session.user.role === "super_admin") redirect("/admin");
+    redirect("/login");
+  }
 
   const { id } = await params;
   const candidateId = parseInt(id);
@@ -41,6 +46,8 @@ export default async function CandidateDetailPage({
 
     results = res;
     flags = fl[0] ?? null;
+  } catch {
+    // Schema not provisioned yet or candidate not found
   } finally {
     await close();
   }
@@ -50,7 +57,7 @@ export default async function CandidateDetailPage({
 
   const qualStatus = flags?.qualifiesUniversity
     ? { label: "Qualifies", color: "#1A6B47", bg: "#E6F4EC" }
-    : flags && flags.totalPasses >= 5
+    : flags && (flags.totalPasses ?? 0) >= 5
     ? { label: "Borderline", color: "#C07818", bg: "#FEF3E2" }
     : { label: "Does Not Qualify", color: "#B83232", bg: "#FDECEC" };
 
@@ -69,11 +76,14 @@ export default async function CandidateDetailPage({
             {candidate!.indexNumber} · {candidate!.programme} · {candidate!.gender === "F" ? "Female" : "Male"}
           </div>
         </div>
-        {flags && (
-          <div style={{ background: qualStatus.bg, color: qualStatus.color, padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: `1px solid ${qualStatus.color}40` }}>
-            {qualStatus.label}
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {flags && (
+            <div style={{ background: qualStatus.bg, color: qualStatus.color, padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: `1px solid ${qualStatus.color}40` }}>
+              {qualStatus.label}
+            </div>
+          )}
+          <PrintButton candidateId={candidateId} />
+        </div>
       </div>
 
       {/* Qualification summary */}
