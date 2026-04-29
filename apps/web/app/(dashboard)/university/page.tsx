@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { and, asc, count, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { and, asc, count, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { getTenantDb } from "@/lib/db/tenant";
 import { AggBar } from "@/components/charts/AggBar";
 import Link from "next/link";

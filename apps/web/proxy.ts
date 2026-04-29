@@ -16,7 +16,7 @@ const SKIP_SUBDOMAINS = new Set(["www", "admin", "api"]);
 export async function proxy(request: NextRequest) {
   const host = request.headers.get("host") ?? "";
   const baseDomain =
-    process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "waecanalytics.com";
+    process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "wassce-analytics.com";
   const pathname = request.nextUrl.pathname;
 
   // ── 1. Extract subdomain ──────────────────────────────────────────────────

@@ -1,6 +1,6 @@
-# WAEC Analytics — Web
+# WASSCE Analytics — Web
 
-Next.js web application for WAEC examination insights and performance data.
+Next.js web application for WASSCE examination insights and performance data.
 
 ## Development
 

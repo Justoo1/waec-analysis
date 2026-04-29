@@ -164,7 +164,7 @@ export default async function DashboardPage({
         <div style={{ background: "#fff", borderRadius: 8, padding: 60, textAlign: "center", color: "#6B6860", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
           <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.25 }}>📂</div>
           <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 6, color: "#0D1F17" }}>No results uploaded yet</div>
-          <div style={{ fontSize: 13, marginBottom: 20 }}>Upload your WAEC results file to start analysing</div>
+          <div style={{ fontSize: 13, marginBottom: 20 }}>Upload your WASSCE results file to start analysing</div>
           <Link href="/upload" style={{ background: "#1A6B47", color: "#fff", padding: "8px 20px", borderRadius: 6, fontSize: 13, textDecoration: "none" }}>
             Upload results →
           </Link>

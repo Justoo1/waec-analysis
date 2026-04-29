@@ -36,6 +36,7 @@ export function CandidatePanel({ candidate, candidateId, onClose }: Props) {
 
   useEffect(() => {
     if (!candidateId) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setResults([]);
     setLoadingResults(true);
     fetch(`/api/candidates/${candidateId}`)

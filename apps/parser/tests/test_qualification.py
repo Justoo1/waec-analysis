@@ -1,4 +1,4 @@
-"""Tests for the WAEC qualification engine."""
+"""Tests for the WASSCE qualification engine."""
 
 from app.engine.qualification import compute_qualification, grade_score, GRADE_SCORES, PASS_GRADES
 

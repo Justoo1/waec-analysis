@@ -16,6 +16,7 @@ export function StatCard({ label, value, sub, subColor, accent = "#1A6B47" }: Pr
   useEffect(() => {
     const num = parseFloat(String(value));
     if (isNaN(num)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDisplayed(value);
       return;
     }

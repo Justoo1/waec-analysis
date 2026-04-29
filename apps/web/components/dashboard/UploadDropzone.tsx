@@ -22,6 +22,9 @@ export function UploadDropzone() {
   const [sittingYear, setSittingYear] = useState(new Date().getFullYear());
   const [errorMsg, setErrorMsg] = useState("");
   const [sittings, setSittings] = useState<Sitting[]>([]);
+  const [currentPage, setCurrentPage] = useState<number | null>(null);
+  const [totalPages, setTotalPages] = useState<number | null>(null);
+  const [extractionMethod, setExtractionMethod] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -46,12 +49,17 @@ export function UploadDropzone() {
         const resp = await fetch(`/api/upload/status/${taskId}`);
         const data = await resp.json();
 
-        if (data.status === "PROGRESS" && data.result) {
+        if (data.status === "PENDING" || data.status === "RECEIVED") {
+          setProgressStage("queued");
+        } else if (data.status === "PROGRESS" && data.result) {
           setProgress(data.result.progress ?? 0);
           setProgressStage(data.result.stage ?? "");
           if (data.result.total_candidates) {
             setParsedCount(data.result.total_candidates);
           }
+          if (data.result.current_page) setCurrentPage(data.result.current_page);
+          if (data.result.total_pages) setTotalPages(data.result.total_pages);
+          if (data.result.method) setExtractionMethod(data.result.method);
         } else if (data.status === "SUCCESS" && data.result) {
           stopPolling();
           setProgress(100);
@@ -80,13 +88,15 @@ export function UploadDropzone() {
     setProgressStage("uploading");
     setState("parsing");
     setParsedCount(0);
+    setCurrentPage(null);
+    setTotalPages(null);
+    setExtractionMethod(null);
 
     const form = new FormData();
     form.append("file", file);
-    form.append("sitting_year", String(sittingYear));
 
     try {
-      const resp = await fetch("/api/upload", { method: "POST", body: form });
+      const resp = await fetch(`/api/upload?sitting_year=${sittingYear}`, { method: "POST", body: form });
       const data = await resp.json();
 
       if (!resp.ok) {
@@ -116,17 +126,48 @@ export function UploadDropzone() {
   if (state === "parsing") {
     return (
       <div style={{ background: "#fff", borderRadius: 8, padding: "32px 28px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-          <span style={{ fontSize: 20 }}>📄</span>
-          <div>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
+          <span style={{ fontSize: 20, marginTop: 2 }}>📄</span>
+          <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 500, color: "#0D1F17" }}>{fileName}</div>
-            <div style={{ fontSize: 12, color: "#6B6860" }}>
-              {progressStage === "uploading" ? "Uploading…" :
-               progressStage === "parsing"  ? "Parsing file…" :
-               progressStage === "schema_ready" ? "Preparing database…" :
-               progressStage === "persisted" ? "Saving candidates…" :
+            <div style={{ fontSize: 12, color: "#6B6860", marginTop: 2 }}>
+              {progressStage === "uploading"    ? "Uploading…" :
+               progressStage === "queued"      ? "Queued, waiting for worker…" :
+               progressStage === "parsing"     ? "Parsing file…" :
+               progressStage === "schema_ready"? "Preparing database…" :
+               progressStage === "persisted"   ? "Saving candidates…" :
                "Processing…"}
             </div>
+
+            {/* Page progress + method — only shown while parsing pages */}
+            {totalPages && currentPage && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                <span style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 12,
+                  color: "#0D1F17",
+                  background: "#F0EDE6",
+                  padding: "3px 8px",
+                  borderRadius: 4,
+                }}>
+                  Page {currentPage} / {totalPages}
+                </span>
+                {extractionMethod && (
+                  <span style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    textTransform: "uppercase" as const,
+                    letterSpacing: "0.06em",
+                    padding: "3px 8px",
+                    borderRadius: 4,
+                    background: extractionMethod === "ocr" ? "#FEF3C7" : "#EEF6F2",
+                    color: extractionMethod === "ocr" ? "#92400E" : "#1A6B47",
+                  }}>
+                    {extractionMethod === "ocr" ? "OCR" : "Text Extraction"}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <div style={{ height: 8, background: "#F0EDE6", borderRadius: 4, marginBottom: 10, overflow: "hidden" }}>
@@ -247,11 +288,11 @@ export function UploadDropzone() {
       >
         <div style={{ fontSize: 36, marginBottom: 12, color: dragging ? "#1A6B47" : "#6B6860" }}>⬆</div>
         <div style={{ fontSize: 16, fontWeight: 500, color: "#0D1F17", marginBottom: 6 }}>
-          Drop your WAEC results file here
+          Drop your WASSCE results file here
         </div>
         <div style={{ fontSize: 13, color: "#6B6860", marginBottom: 20 }}>or click to browse</div>
         <div style={{ display: "inline-flex", gap: 12 }}>
-          {["PDF — WAEC Results Listing", "XLSX — WAEC Analysis Sheet"].map((f) => (
+          {["PDF — WASSCE Results Listing", "XLSX — WASSCE Analysis Sheet"].map((f) => (
             <div key={f} style={{ background: "#F0EDE6", borderRadius: 5, padding: "5px 12px", fontSize: 12, color: "#6B6860" }}>
               {f}
             </div>

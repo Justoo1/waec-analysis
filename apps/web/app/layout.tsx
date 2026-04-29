@@ -20,8 +20,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "WAEC Analytics",
-  description: "Insights and performance data for WAEC examinations.",
+  title: "WASSCE Analytics",
+  description: "Insights and performance data for WASSCE examinations.",
 };
 
 export default function RootLayout({

@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   if (error) return error;
 
   const { db: tdb, schema: s, close } = context.tenantDb;
-  const { results: r, candidates: c, examSittings: es } = s;
+  const { results: r, candidates: c, examSittings: es, qualificationFlags: qf } = s;
 
   const { searchParams } = new URL(request.url);
   const yearsParam = searchParams.get("years") ?? "";
@@ -25,22 +25,55 @@ export async function GET(request: Request) {
   }
 
   try {
-    const rows = await tdb
-      .select({
-        year: es.year,
-        subject: r.subject,
-        passes: sql<string>`SUM(CASE WHEN ${r.grade} IN ('A1','B2','B3','C4','C5','C6') THEN 1 ELSE 0 END)`,
-        total: count(),
-      })
-      .from(r)
-      .innerJoin(c, eq(r.candidateId, c.id))
-      .innerJoin(es, eq(c.sittingId, es.id))
-      .where(inArray(es.year, years))
-      .groupBy(es.year, r.subject);
+    const [subjectRows, candidateRows, passRows, qualRows] = await Promise.all([
+      // Subject-level pass rates
+      tdb
+        .select({
+          year: es.year,
+          subject: r.subject,
+          passes: sql<string>`SUM(CASE WHEN ${r.grade} IN ('A1','B2','B3','C4','C5','C6') THEN 1 ELSE 0 END)`,
+          total: count(),
+        })
+        .from(r)
+        .innerJoin(c, eq(r.candidateId, c.id))
+        .innerJoin(es, eq(c.sittingId, es.id))
+        .where(inArray(es.year, years))
+        .groupBy(es.year, r.subject),
 
-    // Pivot: { subject: string; [year]: passRate }[]
+      // Total candidates per year
+      tdb
+        .select({ year: es.year, total: sql<string>`COUNT(DISTINCT ${c.id})` })
+        .from(c)
+        .innerJoin(es, eq(c.sittingId, es.id))
+        .where(inArray(es.year, years))
+        .groupBy(es.year),
+
+      // Overall pass rate per year (across all result rows)
+      tdb
+        .select({
+          year: es.year,
+          passes: sql<string>`SUM(CASE WHEN ${r.grade} IN ('A1','B2','B3','C4','C5','C6') THEN 1 ELSE 0 END)`,
+          total: count(),
+        })
+        .from(r)
+        .innerJoin(c, eq(r.candidateId, c.id))
+        .innerJoin(es, eq(c.sittingId, es.id))
+        .where(inArray(es.year, years))
+        .groupBy(es.year),
+
+      // University qualifiers per year
+      tdb
+        .select({ year: es.year, qualifiers: count() })
+        .from(qf)
+        .innerJoin(c, eq(qf.candidateId, c.id))
+        .innerJoin(es, eq(c.sittingId, es.id))
+        .where(inArray(es.year, years))
+        .groupBy(es.year),
+    ]);
+
+    // Pivot subject data: { subject: string; [year]: passRate }[]
     const pivot = new Map<string, Record<string, number | string>>();
-    for (const row of rows) {
+    for (const row of subjectRows) {
       if (!pivot.has(row.subject)) {
         pivot.set(row.subject, { subject: row.subject });
       }
@@ -50,12 +83,33 @@ export async function GET(request: Request) {
       pivot.get(row.subject)![String(row.year)] = passRate;
     }
 
+    // Build summary map
+    type YearSummary = { totalCandidates: number; passRate: number; uniQualifiers: number };
+    const summary: Record<string, YearSummary> = {};
+    for (const yr of years) {
+      summary[String(yr)] = { totalCandidates: 0, passRate: 0, uniQualifiers: 0 };
+    }
+    for (const row of candidateRows) {
+      summary[String(row.year)].totalCandidates = parseInt(String(row.total));
+    }
+    for (const row of passRows) {
+      const total = parseInt(String(row.total));
+      const passes = parseInt(row.passes);
+      summary[String(row.year)].passRate =
+        total > 0 ? parseFloat(((passes / total) * 100).toFixed(1)) : 0;
+    }
+    for (const row of qualRows) {
+      summary[String(row.year)].uniQualifiers = Number(row.qualifiers);
+    }
+
     return NextResponse.json({
       data: [...pivot.values()],
       years: years.map(String),
+      summary,
     });
   } catch (err: unknown) {
-    if (isMissingSchemaError(err)) return NextResponse.json({ data: [], years: years.map(String) });
+    if (isMissingSchemaError(err))
+      return NextResponse.json({ data: [], years: years.map(String), summary: {} });
     throw err;
   } finally {
     await close();

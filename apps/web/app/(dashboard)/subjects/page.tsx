@@ -48,6 +48,7 @@ export default function SubjectsPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     const params = new URLSearchParams();
     if (yearParam) params.set("year", yearParam);
@@ -81,19 +82,35 @@ export default function SubjectsPage() {
           <h1 style={{ fontFamily: "'Lora', serif", fontSize: 26, fontWeight: 500, color: "#0D1F17", margin: 0 }}>Subject Analysis</h1>
           <div style={{ fontSize: 13, color: "#6B6860", marginTop: 4 }}>All subjects · pass rates and grade distributions</div>
         </div>
-        <button
-          onClick={handleExportCsv}
-          disabled={subjects.length === 0}
-          className="no-print"
-          style={{
-            padding: "8px 16px", borderRadius: 6, fontSize: 13, fontWeight: 500,
-            background: "#fff", border: "1px solid #E2E0D8", cursor: "pointer",
-            color: "#0D1F17", display: "flex", alignItems: "center", gap: 6,
-            opacity: subjects.length === 0 ? 0.5 : 1,
-          }}
-        >
-          ↓ Export CSV
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={handleExportCsv}
+            disabled={subjects.length === 0}
+            style={{
+              padding: "8px 16px", borderRadius: 6, fontSize: 13, fontWeight: 500,
+              background: "#fff", border: "1px solid #E2E0D8", cursor: "pointer",
+              color: "#0D1F17", display: "flex", alignItems: "center", gap: 6,
+              opacity: subjects.length === 0 ? 0.5 : 1,
+            }}
+          >
+            ↓ Export CSV
+          </button>
+          <a
+            href={`/report/${yearParam ?? "all"}`}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              padding: "8px 16px", borderRadius: 6, fontSize: 13, fontWeight: 500,
+              background: subjects.length === 0 ? "#E2E0D8" : "#1A6B47",
+              border: "none", cursor: subjects.length === 0 ? "default" : "pointer",
+              color: "#fff", display: "flex", alignItems: "center", gap: 6,
+              textDecoration: "none",
+              pointerEvents: subjects.length === 0 ? "none" : "auto",
+            }}
+          >
+            ⎙ Print Report
+          </a>
+        </div>
       </div>
 
       {/* Sort control */}

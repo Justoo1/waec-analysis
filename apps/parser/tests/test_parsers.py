@@ -1,4 +1,4 @@
-"""Tests for the WAEC file parsers."""
+"""Tests for the WASSCE file parsers."""
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch

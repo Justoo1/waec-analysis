@@ -1,4 +1,4 @@
-# WAEC Analytics Platform — Makefile
+# WASSCE Analytics Platform — Makefile
 # Run `make help` to see all available targets.
 
 DOCKER_COMPOSE      := docker compose
@@ -42,8 +42,8 @@ build-web: ## [PROD] Build only the Next.js web image
 	$(DOCKER_COMPOSE) build web
 
 .PHONY: build-parser
-build-parser: ## [PROD] Build only the FastAPI parser image
-	$(DOCKER_COMPOSE) build parser
+build-parser: ## [PROD] Build parser + worker images (both use Dockerfile.prod)
+	$(DOCKER_COMPOSE) build parser worker
 
 .PHONY: build-no-cache
 build-no-cache: ## [PROD] Build all images without layer cache
@@ -124,7 +124,7 @@ dev-logs-web: ## [DEV] Tail only web dev logs
 .PHONY: dev-reset-web
 dev-reset-web: ## [DEV] Remove web container + .next cache volume, then restart fresh
 	$(DOCKER_COMPOSE_DEV) rm -f web
-	docker volume rm waec-analytics_web_next || true
+	docker volume rm wassceanalytics_web_next || true
 	$(DOCKER_COMPOSE_DEV) up -d web
 
 # ─── Docker — Observe ─────────────────────────────────────────────────────────
@@ -153,15 +153,15 @@ logs-db: ## Tail logs from the database
 
 .PHONY: db-shell
 db-shell: ## Open a psql shell inside the running db container
-	$(DOCKER_COMPOSE) exec db psql -U waec -d waec_analytics
+	$(DOCKER_COMPOSE) exec db psql -U wassce -d wassce_analytics
 
 .PHONY: db-generate
 db-generate: ## Generate Drizzle migration files from schema changes
 	cd $(WEB_DIR) && npm run db:generate
 
 .PHONY: db-migrate
-db-migrate: ## Apply pending Drizzle migrations to the database
-	cd $(WEB_DIR) && npm run db:migrate
+db-migrate: ## Apply pending Drizzle migrations to the database (runs inside web container)
+	$(DOCKER_COMPOSE) exec web npm run db:migrate
 
 .PHONY: db-studio
 db-studio: ## Open Drizzle Studio (http://local.drizzle.studio)
@@ -233,16 +233,54 @@ health: ## Ping web and parser health endpoints
 
 .PHONY: health-db
 health-db: ## Check PostgreSQL is accepting connections
-	$(DOCKER_COMPOSE) exec db pg_isready -U waec -d waec_analytics
+	$(DOCKER_COMPOSE) exec db pg_isready -U wassce -d wassce_analytics
 
 # ─── Cleanup ──────────────────────────────────────────────────────────────────
 
 .PHONY: clean
 clean: ## Remove build artifacts (.next, __pycache__, *.pyc)
-	rm -rf $(WEB_DIR)/.next $(WEB_DIR)/tsconfig.tsbuildinfo
+	sudo rm -rf $(WEB_DIR)/.next $(WEB_DIR)/tsconfig.tsbuildinfo
 	find $(PARSER_DIR) -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find $(PARSER_DIR) -name "*.pyc" -delete 2>/dev/null || true
 
 .PHONY: clean-all
 clean-all: clean down-volumes ## Remove build artifacts AND wipe all Docker volumes
 	@echo "All containers stopped and volumes removed."
+
+.PHONY: clean-uploads
+clean-uploads: ## Delete any orphaned upload temp files left by OOM-killed workers
+	$(DOCKER_COMPOSE) exec worker find /shared -name "tmp*.pdf" -o -name "tmp*.xlsx" | xargs -r rm -f
+	@echo "Upload temp files cleared."
+
+.PHONY: docker-nuke
+docker-nuke: ## Stop and remove EVERY container on the system (all projects)
+	@docker ps -aq | xargs -r docker stop
+	@docker ps -aq | xargs -r docker rm
+	@echo "All containers stopped and removed."
+
+.PHONY: docker-prune-containers
+docker-prune-containers: ## Remove all stopped containers
+	docker container prune -f
+
+.PHONY: docker-prune-volumes
+docker-prune-volumes: ## Remove all unused volumes including named Compose volumes
+	docker volume prune -f
+	docker volume ls -q | xargs -r docker volume rm
+
+.PHONY: docker-prune-images
+docker-prune-images: ## Remove all unused images (frees ~8 GB)
+	docker image prune -a -f
+
+.PHONY: docker-prune-cache
+docker-prune-cache: ## Remove all build cache (frees ~7 GB)
+	docker builder prune -a -f
+
+.PHONY: docker-prune-all
+docker-prune-all: ## Remove ALL unused containers, volumes, images, and build cache
+	@echo "WARNING: This will delete all unused Docker data system-wide."
+	docker system prune -a --volumes -f
+	@echo "Done. Run 'make docker-df' to verify."
+
+.PHONY: docker-df
+docker-df: ## Show Docker disk usage summary
+	docker system df

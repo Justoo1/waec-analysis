@@ -11,7 +11,7 @@ from typing import Any
 
 import asyncpg
 
-from app.engine.qualification import CORE_SUBJECTS, GRADE_SCORES
+from app.engine.qualification import GRADE_SCORES, is_core_subject
 
 # ── Programme detection ────────────────────────────────────────────────────────
 
@@ -138,7 +138,7 @@ async def batch_insert_results(
             subject = r["subject"].strip().upper()
             grade = r["grade"].strip().upper()
             grade_score = GRADE_SCORES.get(grade, 10)
-            is_core = subject in CORE_SUBJECTS
+            is_core = is_core_subject(subject)
             rows.append((cand_id, subject, grade, grade_score, is_core, not is_core))
 
     if not rows:

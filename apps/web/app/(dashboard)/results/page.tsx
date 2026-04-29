@@ -92,6 +92,7 @@ export default function CandidatesPage() {
   }, [search, statusFilter, progFilter, page, yearParam]);
 
   // Reset to page 1 when year filter changes
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setPage(1); }, [yearParam]);
 
   useEffect(() => {

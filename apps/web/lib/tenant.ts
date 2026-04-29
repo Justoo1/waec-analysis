@@ -16,7 +16,7 @@ export async function getCurrentSubdomain(): Promise<string | null> {
     headerStore.get("x-forwarded-host") ?? headerStore.get("host") ?? "";
 
   const baseDomain =
-    process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "waecanalytics.com";
+    process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "wassce-analytics.com";
 
   if (host.endsWith(`.${baseDomain}`)) {
     const subdomain = host.slice(0, -(baseDomain.length + 1)).split(":")[0];

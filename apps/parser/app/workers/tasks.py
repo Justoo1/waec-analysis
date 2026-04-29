@@ -1,18 +1,22 @@
 """
-Celery task definitions for background WAEC file processing.
+Celery task definitions for background WASSCE file processing.
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 
 from celery import Celery
+from celery.signals import worker_process_shutdown
+
+_log = logging.getLogger(__name__)
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
 celery_app = Celery(
-    "waec_parser",
+    "wassce_parser",
     broker=REDIS_URL,
     backend=REDIS_URL,
 )
@@ -30,6 +34,17 @@ celery_app.conf.update(
 )
 
 
+@worker_process_shutdown.connect
+def _worker_process_shutdown_handler(pid, exitcode, **kwargs):
+    """
+    Called when a worker child process exits (including OOM SIGKILL).
+    Logs the event so operators know a process was lost.
+    The main process will mark the task as WorkerLostError automatically;
+    this handler exists purely for visibility.
+    """
+    _log.warning("Worker process %s exited with code %s — possible OOM kill", pid, exitcode)
+
+
 @celery_app.task(bind=True, max_retries=3, name="app.workers.tasks.parse_file_task")
 def parse_file_task(
     self,
@@ -39,7 +54,7 @@ def parse_file_task(
     file_type: str,
 ) -> dict:
     """
-    Parse a WAEC results file and persist candidates to the tenant schema.
+    Parse a WASSCE results file and persist candidates to the tenant schema.
     Chains into compute_qualifications_task on success.
     """
     try:
@@ -51,7 +66,21 @@ def parse_file_task(
 
         if file_type == "pdf":
             from app.parsers.pdf_parser import parse_pdf
-            candidates = parse_pdf(file_path)
+
+            def _progress_cb(current_page: int, total_pages: int, method: str) -> None:
+                self.update_state(
+                    state="PROGRESS",
+                    meta={
+                        "stage": "parsing",
+                        "progress": 10 + int((current_page / total_pages) * 20),
+                        "current_page": current_page,
+                        "total_pages": total_pages,
+                        "method": method,
+                        "total_candidates": 0,
+                    },
+                )
+
+            candidates = parse_pdf(file_path, progress_cb=_progress_cb)
         elif file_type == "xlsx":
             from app.parsers.xlsx_parser import parse_xlsx
             candidates = parse_xlsx(file_path)
@@ -107,6 +136,11 @@ def parse_file_task(
             sitting_id=sitting_id,
         )
 
+        try:
+            os.unlink(file_path)
+        except OSError:
+            pass
+
         return {
             "status": "success",
             "total_candidates": total,
@@ -114,12 +148,14 @@ def parse_file_task(
         }
 
     except Exception as exc:
+        # Only delete the temp file once all retries are exhausted — retries
+        # re-run the task from the top and need the file to still be present.
+        if self.request.retries >= self.max_retries:
+            try:
+                os.unlink(file_path)
+            except OSError:
+                pass
         raise self.retry(exc=exc, countdown=60)
-    finally:
-        try:
-            os.unlink(file_path)
-        except OSError:
-            pass
 
 
 @celery_app.task(

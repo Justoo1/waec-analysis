@@ -89,7 +89,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 });
 
-// Extend Auth.js Session type with WAEC-specific fields
+// Extend Auth.js Session type with WASSCE-specific fields
 declare module "next-auth" {
   interface Session {
     user: {

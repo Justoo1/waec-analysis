@@ -13,7 +13,7 @@ export async function TenantHeader({ subdomain }: Props) {
         {school?.name ?? subdomain.toUpperCase()}
       </h1>
       <p className="text-xs text-muted-foreground">
-        {subdomain}.waecanalytics.com
+        {subdomain}.wassce-analytics.com
       </p>
     </div>
   );

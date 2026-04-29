@@ -1,5 +1,5 @@
 """
-WAEC University Entry Qualification Engine.
+WASSCE University Entry Qualification Engine.
 
 WASSCE requirements (KNUST, UG, UCC, etc.):
 - Pass at least 6 subjects (A1–C6)
@@ -17,12 +17,34 @@ CORE_SUBJECTS: frozenset[str] = frozenset(
         "ENGLISH LANGUAGE",
         "ENGLISH LANG",
         "MATHEMATICS(CORE)",
+        "MATHEMATICS (CORE)",
         "CORE MATHEMATICS",
         "SOCIAL STUDIES",
         "INTEGRATED SCIENCE",
         "INT. SCIENCE",
+        "INTEG. SCIENCE",
     }
 )
+
+
+def is_core_subject(subject: str) -> bool:
+    """
+    Flexible core-subject check that handles OCR variants and PDF abbreviations.
+    Uses keyword containment as a fallback when exact set membership fails.
+    """
+    s = subject.upper().strip()
+    if s in CORE_SUBJECTS:
+        return True
+    if "ENGLISH" in s and ("LANG" in s or "LANGUAGE" in s):
+        return True
+    if "MATH" in s and "CORE" in s:
+        return True
+    if "SOCIAL STUDIES" in s:
+        return True
+    # Match "INTEGRATED SCIENCE", "INTEG. SCIENCE", "INT SCIENCE", etc.
+    if "SCIENCE" in s and any(p in s for p in ("INTEGR", "INT.", "INT ")):
+        return True
+    return False
 
 PASS_GRADES: frozenset[str] = frozenset({"A1", "B2", "B3", "C4", "C5", "C6"})
 FAIL_GRADES: frozenset[str] = frozenset({"D7", "E8", "F9"})
@@ -70,8 +92,8 @@ def compute_qualification(candidate_results: list[dict]) -> dict:
         for r in candidate_results
     )
 
-    core_passes = [r for r in passes if r["subject"].upper() in CORE_SUBJECTS]
-    elective_passes = [r for r in passes if r["subject"].upper() not in CORE_SUBJECTS]
+    core_passes = [r for r in passes if is_core_subject(r["subject"])]
+    elective_passes = [r for r in passes if not is_core_subject(r["subject"])]
 
     # Best-six aggregate: lowest 6 grade scores from all passed subjects
     sorted_scores = sorted(GRADE_SCORES[r["grade"]] for r in passes)

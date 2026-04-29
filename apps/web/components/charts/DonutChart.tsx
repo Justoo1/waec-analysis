@@ -32,12 +32,12 @@ export function DonutChart({ segments, size = 220, thickness = 42 }: Props) {
   const r = (size - thickness) / 2 - 4;
   const total = segments.reduce((s, seg) => s + seg.value, 0);
 
-  let cursor = 0;
   const paths = segments.map((seg, i) => {
     const pct = animated ? seg.value / total : 0;
-    const startDeg = cursor;
-    const endDeg = cursor + pct * 358;
-    cursor = endDeg;
+    const startDeg = animated
+      ? (segments.slice(0, i).reduce((s, g) => s + g.value, 0) / total) * 358
+      : 0;
+    const endDeg = startDeg + pct * 358;
     const s = polarToXY(cx, cy, r, startDeg);
     const e = polarToXY(cx, cy, r, endDeg);
     const large = endDeg - startDeg > 180 ? 1 : 0;

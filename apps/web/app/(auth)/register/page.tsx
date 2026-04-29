@@ -44,7 +44,7 @@ export default function RegisterPage() {
         <div className="space-y-1 text-center">
           <h1 className="text-2xl font-semibold">Register your school</h1>
           <p className="text-sm text-muted-foreground">
-            Set up your WAEC Analytics account
+            Set up your WASSCE Analytics account
           </p>
         </div>
 

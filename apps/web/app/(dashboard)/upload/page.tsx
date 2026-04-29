@@ -10,7 +10,7 @@ export default function UploadPage() {
             Upload Results
           </h1>
           <div style={{ fontSize: 13, color: "#6B6860", marginTop: 4 }}>
-            Import your WAEC results file to begin analysis
+            Import your WASSCE results file to begin analysis
           </div>
         </div>
       </div>

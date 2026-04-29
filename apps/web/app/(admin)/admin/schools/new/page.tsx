@@ -104,7 +104,7 @@ export default function RegisterSchoolPage() {
             {field("School name *", errors.name?.message,
               <input {...register("name")} placeholder="Achimota Senior High School" style={inputStyle} />
             )}
-            {field("WAEC school number *", errors.schoolNumber?.message,
+            {field("WASSCE school number *", errors.schoolNumber?.message,
               <input {...register("schoolNumber")} placeholder="0040103" style={inputStyle} maxLength={7} />
             )}
             {field("Subdomain *", errors.subdomain?.message,
@@ -126,7 +126,7 @@ export default function RegisterSchoolPage() {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  .waecanalytics.com
+                  .wassce-analytics.com
                 </span>
               </div>
             )}

@@ -193,7 +193,7 @@ export function SchoolSheet({
           {mode === "view" ? (
             <>
               <InfoRow label="School number" value={<code style={{ fontFamily: "monospace" }}>{school.schoolNumber}</code>} />
-              <InfoRow label="Subdomain" value={`${school.subdomain}.waecanalytics.com`} />
+              <InfoRow label="Subdomain" value={`${school.subdomain}.wassce-analytics.com`} />
               <InfoRow label="Type" value={school.schoolType} />
               <InfoRow label="Region" value={school.region} />
               <InfoRow label="District" value={school.district} />
@@ -228,7 +228,7 @@ export function SchoolSheet({
                 <div style={{ display: "flex", alignItems: "center" }}>
                   <input {...register("subdomain")} style={{ ...inputStyle, borderRadius: "6px 0 0 6px" }} />
                   <span style={{ background: "#0f172a", border: "1px solid #334155", borderLeft: "none", borderRadius: "0 6px 6px 0", padding: "7px 8px", color: "#475569", fontSize: 11, whiteSpace: "nowrap" }}>
-                    .waecanalytics.com
+                    .wassce-analytics.com
                   </span>
                 </div>
               </Field>

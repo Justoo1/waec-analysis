@@ -3,9 +3,9 @@ from __future__ import annotations
 import os
 import re
 import tempfile
-from typing import Any
+from typing import Any, Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 
 from app.workers.tasks import parse_file_task
@@ -24,14 +24,28 @@ class ParseJobResponse(BaseModel):
 @router.post("/upload", response_model=ParseJobResponse)
 async def upload_results(
     file: UploadFile = File(...),
-    school_number: str = Form(...),
-    sitting_year: int = Form(...),
+    school_number: Optional[str] = Form(None),
+    sitting_year: Optional[int] = Form(None),
+    school_number_q: Optional[str] = Query(None, alias="school_number"),
+    sitting_year_q: Optional[int] = Query(None, alias="sitting_year"),
 ):
     """
-    Accept a WAEC Results PDF or XLSX upload and queue a background parse job.
+    Accept a WASSCE Results PDF or XLSX upload and queue a background parse job.
+
+    school_number and sitting_year may be supplied as form fields (legacy) or as
+    URL query parameters (used when the Next.js layer streams the body directly).
     Returns a task ID that the client can poll for progress.
     """
-    if not _SCHOOL_NUMBER_RE.match(school_number):
+    sn = school_number or school_number_q
+    sy = sitting_year if sitting_year is not None else sitting_year_q
+
+    if not sn or sy is None:
+        raise HTTPException(
+            status_code=400,
+            detail="school_number and sitting_year are required.",
+        )
+
+    if not _SCHOOL_NUMBER_RE.match(sn):
         raise HTTPException(
             status_code=400,
             detail="school_number must be exactly 7 digits.",
@@ -53,14 +67,14 @@ async def upload_results(
     with tempfile.NamedTemporaryFile(
         suffix=f".{ext}", delete=False, dir=upload_dir
     ) as tmp:
-        content = await file.read()
-        tmp.write(content)
+        while chunk := await file.read(1024 * 1024):  # 1 MB chunks
+            tmp.write(chunk)
         tmp_path = tmp.name
 
     task = parse_file_task.delay(
         file_path=tmp_path,
-        school_number=school_number,
-        sitting_year=sitting_year,
+        school_number=sn,
+        sitting_year=sy,
         file_type=ext,
     )
 
@@ -81,6 +95,9 @@ async def task_status(task_id: str) -> dict[str, Any]:
     # PROGRESS state stores meta in result.info; SUCCESS/FAILURE in result.result
     if result.state == "PROGRESS":
         payload = result.info
+    elif result.state == "FAILURE":
+        # result.result is the exception object — not JSON-serializable
+        payload = {"error": str(result.result)}
     elif result.ready():
         payload = result.result
     else:

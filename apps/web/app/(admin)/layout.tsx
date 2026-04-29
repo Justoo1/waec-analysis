@@ -21,7 +21,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         }}
       >
         <span style={{ color: "#f1f5f9", fontWeight: 600, fontSize: 15, letterSpacing: "-0.01em" }}>
-          WAEC Analytics — Super Admin
+          WASSCE Analytics — Super Admin
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <span style={{ color: "#94a3b8", fontSize: 13 }}>{session.user.email}</span>
