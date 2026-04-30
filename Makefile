@@ -199,8 +199,9 @@ create-admin: ## Create a super_admin user (EMAIL= PASSWORD= NAME= required)
 	@[ -n "$(EMAIL)" ] || (echo "Usage: make create-admin EMAIL=you@example.com PASSWORD=secret NAME='Full Name'"; exit 1)
 	@[ -n "$(PASSWORD)" ] || (echo "Usage: make create-admin EMAIL=you@example.com PASSWORD=secret NAME='Full Name'"; exit 1)
 	@[ -n "$(NAME)" ] || (echo "Usage: make create-admin EMAIL=you@example.com PASSWORD=secret NAME='Full Name'"; exit 1)
-	$(DOCKER_COMPOSE) exec -e ADMIN_EMAIL="$(EMAIL)" -e ADMIN_PASSWORD="$(PASSWORD)" -e ADMIN_NAME="$(NAME)" \
-		web node scripts/create-super-admin.mjs
+	$(DOCKER_COMPOSE) run --rm \
+		-e ADMIN_EMAIL="$(EMAIL)" -e ADMIN_PASSWORD="$(PASSWORD)" -e ADMIN_NAME="$(NAME)" \
+		migrator node scripts/create-super-admin.mjs
 
 # ─── Local dev (no Docker) ────────────────────────────────────────────────────
 

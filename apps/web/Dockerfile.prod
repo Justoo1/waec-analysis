@@ -37,10 +37,11 @@ ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "server.js"]
 
-# Migration runner — full node_modules so drizzle-orm is resolvable
+# Tools stage — full node_modules for migration + admin scripts
 FROM base AS migrator
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY lib/db/migrations ./lib/db/migrations
 COPY scripts/migrate.mjs ./scripts/migrate.mjs
+COPY scripts/create-super-admin.mjs ./scripts/create-super-admin.mjs
 CMD ["node", "scripts/migrate.mjs"]
