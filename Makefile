@@ -37,14 +37,15 @@ gen-secret: ## Generate a random AUTH_SECRET and print it
 deploy: ## [PROD] Full deploy: pull latest code, rebuild images, restart, run all migrations
 	git pull
 	$(DOCKER_COMPOSE) build
+	$(DOCKER_COMPOSE) build migrator
 	$(DOCKER_COMPOSE) up -d
-	$(DOCKER_COMPOSE) exec web node scripts/migrate.mjs
+	$(DOCKER_COMPOSE) run --rm migrator
 	$(DOCKER_COMPOSE) exec parser alembic upgrade head
 	@echo "Deploy complete."
 
 .PHONY: migrate
 migrate: ## [PROD] Run all pending migrations (Drizzle + Alembic)
-	$(DOCKER_COMPOSE) exec web node scripts/migrate.mjs
+	$(DOCKER_COMPOSE) run --rm migrator
 	$(DOCKER_COMPOSE) exec parser alembic upgrade head
 
 # ─── Production — Build ───────────────────────────────────────────────────────
@@ -176,8 +177,8 @@ db-generate: ## Generate Drizzle migration files from schema changes
 	cd $(WEB_DIR) && npm run db:generate
 
 .PHONY: db-migrate
-db-migrate: ## Apply pending Drizzle migrations to the database (runs inside web container)
-	$(DOCKER_COMPOSE) exec web node scripts/migrate.mjs
+db-migrate: ## Apply pending Drizzle migrations to the database (runs migrator container)
+	$(DOCKER_COMPOSE) run --rm migrator
 
 .PHONY: db-studio
 db-studio: ## Open Drizzle Studio (http://local.drizzle.studio)

@@ -74,6 +74,20 @@ services:
     mem_limit: 2g
     restart: unless-stopped
 
+  migrator:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.prod
+      target: migrator
+    environment:
+      DATABASE_URL: postgresql://wassce:wassce@db:5432/wassce_analytics
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - tools
+    restart: "no"
+
   db:
     image: postgres:16-alpine
     environment:
