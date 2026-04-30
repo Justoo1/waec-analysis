@@ -20,7 +20,7 @@ export async function PATCH(req: Request) {
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.errors[0]?.message ?? "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   }
 
   const { currentPassword, newPassword } = parsed.data;
@@ -34,7 +34,11 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const valid = await compare(currentPassword, user.passwordHash);
+  if (!user.passwordHash) {
+    return NextResponse.json({ error: "Account has no password set" }, { status: 400 });
+  }
+
+  const valid = compare(currentPassword, user.passwordHash);
   if (!valid) {
     return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 });
   }
