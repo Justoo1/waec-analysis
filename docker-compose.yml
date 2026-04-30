@@ -1,8 +1,15 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   web:
     build:
       context: ./apps/web
       dockerfile: Dockerfile.prod
+      target: runner
     ports:
       - "127.0.0.1:3000:3000"
     environment:
@@ -20,11 +27,13 @@ services:
       BASE_DOMAIN: ${BASE_DOMAIN:-wassceanalytics.edtmsys.com}
       NEXT_PUBLIC_BASE_DOMAIN: ${BASE_DOMAIN:-wassceanalytics.edtmsys.com}
       NODE_ENV: production
+    mem_limit: 512m
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
+    logging: *default-logging
     restart: unless-stopped
 
   parser:
@@ -43,11 +52,13 @@ services:
       UPLOAD_TMP_DIR: /shared
     volumes:
       - parser_uploads:/shared
+    mem_limit: 256m
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
+    logging: *default-logging
     restart: unless-stopped
 
   worker:
@@ -66,12 +77,13 @@ services:
       UPLOAD_TMP_DIR: /shared
     volumes:
       - parser_uploads:/shared
+    mem_limit: 1g
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
-    mem_limit: 2g
+    logging: *default-logging
     restart: unless-stopped
 
   migrator:
@@ -94,19 +106,30 @@ services:
       POSTGRES_USER: wassce
       POSTGRES_PASSWORD: wassce
       POSTGRES_DB: wassce_analytics
+    command: >
+      postgres
+      -c shared_buffers=128MB
+      -c max_connections=50
+      -c work_mem=4MB
+      -c maintenance_work_mem=64MB
     volumes:
       - pgdata:/var/lib/postgresql/data
+    mem_limit: 512m
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U wassce -d wassce_analytics"]
       interval: 5s
       timeout: 5s
       retries: 5
+    logging: *default-logging
     restart: unless-stopped
 
   redis:
     image: redis:7-alpine
+    command: redis-server --maxmemory 96mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
+    mem_limit: 128m
+    logging: *default-logging
     restart: unless-stopped
 
   minio:
@@ -117,6 +140,8 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
     volumes:
       - minio_data:/data
+    mem_limit: 256m
+    logging: *default-logging
     restart: unless-stopped
 
 volumes:

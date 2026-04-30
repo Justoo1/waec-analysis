@@ -252,6 +252,20 @@ health: ## Ping web and parser health endpoints
 health-db: ## Check PostgreSQL is accepting connections
 	$(DOCKER_COMPOSE) exec db pg_isready -U wassce -d wassce_analytics
 
+# ─── Resource monitoring ──────────────────────────────────────────────────────
+
+.PHONY: stats
+stats: ## Show live CPU + RAM usage per container
+	docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}"
+
+.PHONY: disk
+disk: ## Show disk usage: Docker data + host filesystem
+	@echo "=== Docker ==="
+	@docker system df
+	@echo ""
+	@echo "=== Host filesystem ==="
+	@df -h /
+
 # ─── Cleanup ──────────────────────────────────────────────────────────────────
 
 .PHONY: clean
