@@ -31,6 +31,22 @@ env: ## Copy .env.example → .env (skip if .env already exists)
 gen-secret: ## Generate a random AUTH_SECRET and print it
 	@openssl rand -base64 32
 
+# ─── Production — Deploy ──────────────────────────────────────────────────────
+
+.PHONY: deploy
+deploy: ## [PROD] Full deploy: pull latest code, rebuild images, restart, run all migrations
+	git pull
+	$(DOCKER_COMPOSE) build
+	$(DOCKER_COMPOSE) up -d
+	$(DOCKER_COMPOSE) exec web node scripts/migrate.mjs
+	$(DOCKER_COMPOSE) exec parser alembic upgrade head
+	@echo "Deploy complete."
+
+.PHONY: migrate
+migrate: ## [PROD] Run all pending migrations (Drizzle + Alembic)
+	$(DOCKER_COMPOSE) exec web node scripts/migrate.mjs
+	$(DOCKER_COMPOSE) exec parser alembic upgrade head
+
 # ─── Production — Build ───────────────────────────────────────────────────────
 
 .PHONY: build
@@ -51,7 +67,7 @@ build-no-cache: ## [PROD] Build all images without layer cache
 
 .PHONY: pull
 pull: ## Pull latest base images from Docker Hub
-	$(DOCKER_COMPOSE) pull db redis minio nginx
+	$(DOCKER_COMPOSE) pull db redis minio
 
 # ─── Production — Run ─────────────────────────────────────────────────────────
 
@@ -161,7 +177,7 @@ db-generate: ## Generate Drizzle migration files from schema changes
 
 .PHONY: db-migrate
 db-migrate: ## Apply pending Drizzle migrations to the database (runs inside web container)
-	$(DOCKER_COMPOSE) exec web npm run db:migrate
+	$(DOCKER_COMPOSE) exec web node scripts/migrate.mjs
 
 .PHONY: db-studio
 db-studio: ## Open Drizzle Studio (http://local.drizzle.studio)
