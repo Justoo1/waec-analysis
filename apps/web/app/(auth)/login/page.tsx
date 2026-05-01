@@ -91,8 +91,12 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-6">
-        <div className="space-y-1 text-center">
-          <h1 className="text-2xl font-semibold">WASSCE Analytics</h1>
+        <div className="space-y-3 text-center">
+          <img
+            src="/logo.svg"
+            alt="WASSCE Analytics"
+            className="mx-auto h-12"
+          />
           <p className="text-sm text-muted-foreground">Sign in to your school account</p>
         </div>
         <Suspense fallback={<div className="h-48 animate-pulse rounded-lg bg-muted" />}>

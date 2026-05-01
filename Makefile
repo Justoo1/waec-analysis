@@ -6,6 +6,11 @@ DOCKER_COMPOSE_DEV  := docker compose -f docker-compose.yml -f docker-compose.de
 WEB_DIR             := apps/web
 PARSER_DIR          := apps/parser
 
+# Production server — override via env or command line:
+#   make ship DEPLOY_HOST=root@1.2.3.4
+DEPLOY_HOST ?= root@srv878651
+DEPLOY_DIR  ?= /opt/waec-analysis
+
 .DEFAULT_GOAL := help
 
 # ─── Help ─────────────────────────────────────────────────────────────────────
@@ -32,6 +37,15 @@ gen-secret: ## Generate a random AUTH_SECRET and print it
 	@openssl rand -base64 32
 
 # ─── Production — Deploy ──────────────────────────────────────────────────────
+
+.PHONY: ship
+ship: ## [LOCAL] Push to git then SSH into server and redeploy (usage: make ship)
+	git push
+	ssh $(DEPLOY_HOST) "cd $(DEPLOY_DIR) && make deploy"
+
+.PHONY: ship-branch
+ship-branch: ## [LOCAL] Push current branch to git (no server deploy)
+	git push -u origin HEAD
 
 .PHONY: deploy
 deploy: ## [PROD] Full deploy: pull latest code, rebuild images, restart, run all migrations

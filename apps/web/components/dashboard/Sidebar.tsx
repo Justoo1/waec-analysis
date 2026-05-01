@@ -62,8 +62,16 @@ export function Sidebar({ userEmail, schoolName, schoolNumber }: Props) {
         height: "100vh", position: "sticky", top: 0, overflow: "hidden",
       }}
     >
+      {/* Logo */}
+      <div style={{ padding: "18px 20px 16px", borderBottom: "1px solid rgba(255,255,255,0.07)", display: "flex", alignItems: "center", gap: 10 }}>
+        <img src="/icon.svg" alt="" style={{ width: 28, height: 28, borderRadius: 6, flexShrink: 0 }} />
+        <span style={{ color: "#fff", fontSize: 13, fontWeight: 600, letterSpacing: "-0.01em", fontFamily: "'Lora', serif" }}>
+          WASSCE Analytics
+        </span>
+      </div>
+
       {/* School info */}
-      <div style={{ padding: "24px 20px 20px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+      <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
         <div style={{ width: 36, height: 36, borderRadius: 8, background: "#1A6B47", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10, fontSize: 18, color: "#fff" }}>
           ✦
         </div>

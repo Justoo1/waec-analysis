@@ -20,9 +20,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           justifyContent: "space-between",
         }}
       >
-        <span style={{ color: "#f1f5f9", fontWeight: 600, fontSize: 15, letterSpacing: "-0.01em" }}>
-          WASSCE Analytics — Super Admin
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <img src="/icon.svg" alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
+          <span style={{ color: "#f1f5f9", fontWeight: 600, fontSize: 15, letterSpacing: "-0.01em" }}>
+            WASSCE Analytics
+          </span>
+          <span style={{ color: "#475569", fontSize: 13, fontWeight: 400 }}>— Super Admin</span>
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <span style={{ color: "#94a3b8", fontSize: 13 }}>{session.user.email}</span>
           <LogoutButton />
