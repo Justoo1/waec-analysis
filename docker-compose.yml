@@ -16,7 +16,7 @@ services:
       DATABASE_URL: postgresql://wassce:wassce@db:5432/wassce_analytics
       DIRECT_URL: postgresql://wassce:wassce@db:5432/wassce_analytics
       AUTH_SECRET: ${AUTH_SECRET}
-      AUTH_URL: ${AUTH_URL:-https://wassceanalytics.edtmsys.com}
+      AUTH_URL: ${AUTH_URL:-https://wassceanalytics.ghsch.com}
       PARSER_SERVICE_URL: http://parser:8000
       REDIS_URL: redis://redis:6379/0
       MINIO_ENDPOINT: minio:9000
@@ -24,9 +24,10 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-wassce-uploads}
       MINIO_USE_SSL: "false"
-      BASE_DOMAIN: ${BASE_DOMAIN:-wassceanalytics.edtmsys.com}
-      NEXT_PUBLIC_BASE_DOMAIN: ${BASE_DOMAIN:-wassceanalytics.edtmsys.com}
+      BASE_DOMAIN: ${BASE_DOMAIN:-wassceanalytics.ghsch.com}
+      NEXT_PUBLIC_BASE_DOMAIN: ${BASE_DOMAIN:-wassceanalytics.ghsch.com}
       NODE_ENV: production
+      AUTH_TRUST_HOST: "true"
     mem_limit: 512m
     depends_on:
       db:
