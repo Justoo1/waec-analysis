@@ -144,7 +144,7 @@ export default async function DashboardPage({
   return (
     <div>
       {/* Page header */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24, paddingBottom: 20, borderBottom: "1px solid #E2E0D8" }}>
+      <div className="page-header">
         <div>
           <h1 style={{ fontFamily: "'Lora', serif", fontSize: 26, fontWeight: 500, color: "#0D1F17", margin: 0 }}>
             WASSCE {stats.latestYear ?? "—"} — Overview
@@ -172,7 +172,7 @@ export default async function DashboardPage({
       ) : (
         <>
           {/* Stat cards */}
-          <div style={{ display: "flex", gap: 14, marginBottom: 24 }}>
+          <div className="stat-cards">
             <StatCard label="Total Candidates" value={stats.totalCandidates} sub={`WASSCE ${stats.latestYear}`} />
             <StatCard label="University Qualifiers" value={stats.qualifiers} sub={`${stats.qualifyPct}% of cohort`} subColor="#1A6B47" />
             <StatCard label="Overall Pass Rate" value={`${stats.overallPassRate}%`} sub="Across all subjects" />
@@ -180,8 +180,8 @@ export default async function DashboardPage({
           </div>
 
           {/* Charts row */}
-          <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
-            <div style={{ flex: "0 0 340px", background: "#fff", borderRadius: 8, padding: "20px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+          <div className="charts-row">
+            <div className="donut-chart-card" style={{ background: "#fff", borderRadius: 8, padding: "20px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
               <div style={{ fontSize: 14, fontWeight: 500, color: "#0D1F17", marginBottom: 16 }}>Qualification Overview</div>
               <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
                 <DonutChart segments={DONUT_SEGMENTS} size={160} thickness={32} />
@@ -210,7 +210,7 @@ export default async function DashboardPage({
           {/* Subject performance summary */}
           <div style={{ background: "#fff", borderRadius: 8, padding: "20px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
             <div style={{ fontSize: 14, fontWeight: 500, color: "#0D1F17", marginBottom: 16 }}>Subject Performance Summary</div>
-            <div style={{ display: "flex", gap: 24 }}>
+            <div className="subject-perf-cols">
               {[
                 { title: "↑ Top performing",  items: topSubjects,    color: "#1A6B47" },
                 { title: "↓ Needs attention", items: bottomSubjects, color: "#B83232" },

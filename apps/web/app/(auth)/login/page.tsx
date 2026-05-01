@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -92,10 +93,12 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-3 text-center">
-          <img
+          <Image
             src="/logo.svg"
             alt="WASSCE Analytics"
-            className="mx-auto h-12"
+            width={160}
+            height={48}
+            className="mx-auto h-12 w-auto"
           />
           <p className="text-sm text-muted-foreground">Sign in to your school account</p>
         </div>

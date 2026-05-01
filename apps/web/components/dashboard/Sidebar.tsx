@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
 
@@ -18,9 +19,11 @@ interface Props {
   userEmail: string;
   schoolName: string;
   schoolNumber: string;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export function Sidebar({ userEmail, schoolName, schoolNumber }: Props) {
+export function Sidebar({ userEmail, schoolName, schoolNumber, isOpen = false, onClose }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -55,19 +58,28 @@ export function Sidebar({ userEmail, schoolName, schoolNumber }: Props) {
   const initials = userEmail.split("@")[0].slice(0, 2).toUpperCase();
 
   return (
-    <aside
-      style={{
-        width: 240, flexShrink: 0, background: "#0D1F17",
-        display: "flex", flexDirection: "column",
-        height: "100vh", position: "sticky", top: 0, overflow: "hidden",
-      }}
-    >
+    <aside className={`dashboard-sidebar${isOpen ? " open" : ""}`}>
       {/* Logo */}
       <div style={{ padding: "18px 20px 16px", borderBottom: "1px solid rgba(255,255,255,0.07)", display: "flex", alignItems: "center", gap: 10 }}>
-        <img src="/icon.svg" alt="" style={{ width: 28, height: 28, borderRadius: 6, flexShrink: 0 }} />
-        <span style={{ color: "#fff", fontSize: 13, fontWeight: 600, letterSpacing: "-0.01em", fontFamily: "'Lora', serif" }}>
+        <Image src="/icon.svg" alt="" width={28} height={28} style={{ borderRadius: 6, flexShrink: 0 }} />
+        <span style={{ color: "#fff", fontSize: 13, fontWeight: 600, letterSpacing: "-0.01em", fontFamily: "'Lora', serif", flex: 1 }}>
           WASSCE Analytics
         </span>
+        {/* Close button — visible only on mobile via CSS */}
+        <button
+          className="sidebar-close-btn"
+          onClick={onClose}
+          aria-label="Close menu"
+          style={{
+            background: "transparent", border: "none", cursor: "pointer",
+            color: "rgba(255,255,255,0.5)", padding: "4px", alignItems: "center",
+            flexShrink: 0, lineHeight: 1,
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
       </div>
 
       {/* School info */}
@@ -93,6 +105,7 @@ export function Sidebar({ userEmail, schoolName, schoolNumber }: Props) {
             <Link
               key={item.href}
               href={navHref(item.href)}
+              onClick={onClose}
               style={{
                 display: "flex", alignItems: "center", gap: 10, width: "100%",
                 padding: "9px 10px", borderRadius: 6, marginBottom: 2,
@@ -115,6 +128,7 @@ export function Sidebar({ userEmail, schoolName, schoolNumber }: Props) {
 
         <Link
           href={navHref("/settings")}
+          onClick={onClose}
           style={{
             display: "flex", alignItems: "center", gap: 10, width: "100%",
             padding: "9px 10px", borderRadius: 6,

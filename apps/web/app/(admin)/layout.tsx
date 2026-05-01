@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import { LogoutButton } from "./_components/LogoutButton";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -9,26 +10,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div style={{ minHeight: "100vh", background: "#0f172a" }}>
-      <header
-        style={{
-          background: "#1e293b",
-          borderBottom: "1px solid #334155",
-          padding: "0 32px",
-          height: 56,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
+      <header className="admin-header">
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <img src="/icon.svg" alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
+          <Image src="/icon.svg" alt="" width={28} height={28} style={{ borderRadius: 6, flexShrink: 0 }} />
           <span style={{ color: "#f1f5f9", fontWeight: 600, fontSize: 15, letterSpacing: "-0.01em" }}>
             WASSCE Analytics
           </span>
           <span style={{ color: "#475569", fontSize: 13, fontWeight: 400 }}>— Super Admin</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span style={{ color: "#94a3b8", fontSize: 13 }}>{session.user.email}</span>
+          <span className="admin-header-email" style={{ color: "#94a3b8", fontSize: 13 }}>{session.user.email}</span>
           <LogoutButton />
         </div>
       </header>
