@@ -55,7 +55,7 @@ deploy: ## [PROD] Full deploy: pull latest code, rebuild images, restart, run al
 	$(DOCKER_COMPOSE) up -d
 	$(DOCKER_COMPOSE) run --rm migrator
 	$(DOCKER_COMPOSE) exec parser alembic upgrade head
-	docker image prune -f
+	$(MAKE) docker-prune-images
 	@echo "Deploy complete."
 
 .PHONY: migrate
