@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" fill="none">
+  <!-- Icon mark -->
+  <rect width="48" height="48" rx="9" fill="#166534"/>
+
+  <!-- Bars -->
+  <rect x="6"  y="30" width="9" height="12" rx="2" fill="white" opacity="0.55"/>
+  <rect x="19.5" y="21" width="9" height="21" rx="2" fill="white" opacity="0.75"/>
+  <rect x="33" y="12" width="9" height="30" rx="2" fill="white"/>
+
+  <!-- Trend line -->
+  <polyline
+    points="10.5,29 24,20 37.5,11"
+    stroke="#4ade80"
+    stroke-width="2.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+
+  <!-- Arrow head -->
+  <polyline
+    points="34,9.5 37.5,11 36.5,15"
+    stroke="#4ade80"
+    stroke-width="2.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+
+  <!-- WASSCE text -->
+  <text
+    x="62"
+    y="20"
+    font-family="'DM Sans', system-ui, -apple-system, sans-serif"
+    font-size="15"
+    font-weight="700"
+    letter-spacing="0.5"
+    fill="#166534"
+  >WASSCE</text>
+
+  <!-- Analytics text -->
+  <text
+    x="62"
+    y="37"
+    font-family="'DM Sans', system-ui, -apple-system, sans-serif"
+    font-size="13"
+    font-weight="400"
+    letter-spacing="2"
+    fill="#4b5563"
+  >ANALYTICS</text>
+
+  <!-- Vertical divider -->
+  <line x1="56" y1="10" x2="56" y2="38" stroke="#e5e7eb" stroke-width="1.5"/>
+</svg>

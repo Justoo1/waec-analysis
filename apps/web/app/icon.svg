@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Background -->
+  <rect width="32" height="32" rx="6" fill="#166534"/>
+
+  <!-- Bars (ascending left to right) -->
+  <rect x="4"  y="20" width="6" height="8" rx="1.5" fill="white" opacity="0.55"/>
+  <rect x="13" y="14" width="6" height="14" rx="1.5" fill="white" opacity="0.75"/>
+  <rect x="22" y="8"  width="6" height="20" rx="1.5" fill="white"/>
+
+  <!-- Upward trend line -->
+  <polyline
+    points="7,19.5 16,13.5 25,7.5"
+    stroke="#4ade80"
+    stroke-width="1.8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+
+  <!-- Arrow head -->
+  <polyline
+    points="22,6.5 25,7.5 24,10.5"
+    stroke="#4ade80"
+    stroke-width="1.8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+</svg>
