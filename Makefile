@@ -8,7 +8,7 @@ PARSER_DIR          := apps/parser
 
 # Production server — override via env or command line:
 #   make ship DEPLOY_HOST=root@1.2.3.4
-DEPLOY_HOST ?= root@srv878651
+DEPLOY_HOST ?= root@168.231.116.132
 DEPLOY_DIR  ?= /opt/waec-analysis
 
 .DEFAULT_GOAL := help
@@ -55,6 +55,7 @@ deploy: ## [PROD] Full deploy: pull latest code, rebuild images, restart, run al
 	$(DOCKER_COMPOSE) up -d
 	$(DOCKER_COMPOSE) run --rm migrator
 	$(DOCKER_COMPOSE) exec parser alembic upgrade head
+	docker image prune -f
 	@echo "Deploy complete."
 
 .PHONY: migrate
